@@ -185,8 +185,8 @@ class ZZZGachaApp:
                     ft.TabBar(
                         tab_alignment=ft.TabAlignment.CENTER,
                         tabs=[
-                            ft.Tab(label="🎰 ШАНС ВЫПАДЕНИЯ", icon=ft.Icons.CASINO),
-                            ft.Tab(label="📊 РАСЧЁТ КРУТОК", icon=ft.Icons.CALCULATE),
+                            ft.Tab(label="ШАНС ВЫПАДЕНИЯ", icon=ft.Icons.CASINO),
+                            ft.Tab(label="РАСЧЁТ КРУТОК", icon=ft.Icons.CALCULATE),
                         ],
                     ),
                     ft.TabBarView(
