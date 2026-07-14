@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 
 def _get_config_dir() -> Path:
@@ -12,7 +12,8 @@ def _get_config_file() -> Path:
     """Возвращает путь к файлу настроек."""
     return _get_config_dir() / "settings.json"
 
-DEFAULT_SETTINGS = {
+
+DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "wish": {
         "pity": 30,
         "guarantee": False,
@@ -34,18 +35,17 @@ def ensure_config_dir() -> None:
     _get_config_dir().mkdir(parents=True, exist_ok=True)
 
 
-def load_settings() -> Dict[str, Any]:
+def load_settings() -> dict[str, Any]:
     """Загружает настройки из файла."""
     ensure_config_dir()
     config_file = _get_config_file()
     if not config_file.exists():
         return DEFAULT_SETTINGS.copy()
-    
+
     try:
         with open(config_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
-        # Объединяем с дефолтами на случай новых полей
+
         result = DEFAULT_SETTINGS.copy()
         for key, value in data.items():
             if key in result and isinstance(value, dict):
@@ -57,7 +57,7 @@ def load_settings() -> Dict[str, Any]:
         return DEFAULT_SETTINGS.copy()
 
 
-def save_settings(settings: Dict[str, Any]) -> bool:
+def save_settings(settings: dict[str, Any]) -> bool:
     """Сохраняет настройки в файл."""
     ensure_config_dir()
     config_file = _get_config_file()
@@ -69,7 +69,7 @@ def save_settings(settings: Dict[str, Any]) -> bool:
         return False
 
 
-def get_wish_settings() -> Dict[str, Any]:
+def get_wish_settings() -> dict[str, Any]:
     """Получает настройки калькулятора шансов."""
     return load_settings().get("wish", DEFAULT_SETTINGS["wish"])
 
@@ -86,7 +86,7 @@ def save_wish_settings(pity: int, guarantee: bool, pulls: int, copies: int) -> b
     return save_settings(settings)
 
 
-def get_pull_settings() -> Dict[str, Any]:
+def get_pull_settings() -> dict[str, Any]:
     """Получает настройки калькулятора круток."""
     return load_settings().get("pull", DEFAULT_SETTINGS["pull"])
 

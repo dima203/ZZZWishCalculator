@@ -1,72 +1,56 @@
+from typing import Any
+
 import flet as ft
 
 from core import ZZZGachaCalculator, ZZZPullCalculator, storage
 
-
 # ZZZ (Zenless Zone Zero) Cyberpunk/Neon Color Palette
-COLORS = {
-    # Backgrounds
-    "bg": "#0A0A0A",              # Near black - main background
-    "bg_secondary": "#0F0F0F",    # Slightly lighter for panels
-    "card_bg": "#121212",         # Card backgrounds
-    "card_bg_hover": "#1A1A1A",   # Card hover state
-    
-    # Primary accent - ZZZ Orange (signature color)
-    "primary": "#FF6B00",         # Main accent - vibrant orange
-    "primary_glow": "#FF8C00",    # Glow variant
-    "primary_dim": "#CC5500",     # Dimmed variant
-    
-    # Secondary accent - Cyan/Teal (Hollow/tech aesthetic)
-    "secondary": "#00E5FF",       # Bright cyan
-    "secondary_glow": "#00FFFF",  # Cyan glow
-    "secondary_dim": "#00B4D8",   # Dimmed cyan
-    
-    # Tertiary accent - Purple/Violet (Ether/etherous)
-    "accent": "#A855F7",          # Violet/Purple
-    "accent_glow": "#C084FC",     # Purple glow
-    "accent_dim": "#8B5CF6",      # Dimmed purple
-    
-    # Text colors
-    "text": "#FFFFFF",            # Pure white
-    "text_secondary": "#A0A0A0",  # Muted gray
-    "text_muted": "#666666",      # Very muted
-    "text_on_primary": "#0A0A0A", # Text on primary buttons
-    
-    # Status colors
-    "success": "#22C55E",         # Green
-    "success_glow": "#4ADE80",    # Green glow
-    "error": "#EF4444",           # Red
-    "error_glow": "#F87171",      # Red glow
-    "warning": "#FBBF24",         # Amber/yellow
-    
-    # Border/outline
-    "border": "#2A2A2A",          # Subtle borders
-    "border_accent": "#FF6B00",   # Accent borders
-    "border_secondary": "#00E5FF", # Secondary borders
-    
-    # Gradients (for reference - used in styling)
-    "grad_primary": "linear-gradient(135deg, #FF6B00 0%, #FF8C00 100%)",
-    "grad_secondary": "linear-gradient(135deg, #00E5FF 0%, #00B4D8 100%)",
-    "grad_accent": "linear-gradient(135deg, #A855F7 0%, #8B5CF6 100%)",
-    "grad_card": "linear-gradient(135deg, #1A1A1A 0%, #121212 100%)",
+COLORS: dict[str, str] = {
+    "bg": "#0A0A0A",
+    "bg_secondary": "#0F0F0F",
+    "card_bg": "#121212",
+    "card_bg_hover": "#1A1A1A",
+    "primary": "#FF6B00",
+    "primary_glow": "#FF8C00",
+    "primary_dim": "#CC5500",
+    "secondary": "#00E5FF",
+    "secondary_glow": "#00FFFF",
+    "secondary_dim": "#00B4D8",
+    "accent": "#A855F7",
+    "accent_glow": "#C084FC",
+    "accent_dim": "#8B5CF6",
+    "text": "#FFFFFF",
+    "text_secondary": "#A0A0A0",
+    "text_muted": "#666666",
+    "text_on_primary": "#0A0A0A",
+    "success": "#22C55E",
+    "success_glow": "#4ADE80",
+    "error": "#EF4444",
+    "error_glow": "#F87171",
+    "warning": "#FBBF24",
+    "border": "#2A2A2A",
+    "border_accent": "#FF6B00",
+    "border_secondary": "#00E5FF",
 }
 
 
 class ZZZGachaApp:
     """Главное представление приложения."""
 
-    def __init__(self, page: ft.Page):
-        self.page = page
+    def __init__(self, page: ft.Page) -> None:
+        self.page: ft.Page = page
+        self.wish_settings: dict[str, Any]
+        self.pull_settings: dict[str, Any]
         self._load_settings()
         self._setup_page()
         self._build_ui()
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Загружает сохраненные настройки."""
         self.wish_settings = storage.get_wish_settings()
         self.pull_settings = storage.get_pull_settings()
 
-    def _setup_page(self):
+    def _setup_page(self) -> None:
         """Настройка страницы: заголовок, размер, тема."""
         self.page.title = "⚡ ZZZ Wish Simulator ⚡"
         self.page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
@@ -79,7 +63,6 @@ class ZZZGachaApp:
         self.page.window_min_width = 480
         self.page.window_min_height = 600
 
-        # Кастомная тема в стиле ZZZ (киберпанк/неон)
         self.page.theme = ft.Theme(
             color_scheme=ft.ColorScheme(
                 primary=COLORS["primary"],
@@ -94,7 +77,7 @@ class ZZZGachaApp:
             ),
             text_theme=ft.TextTheme(
                 headline_large=ft.TextStyle(
-                    size=36, weight=ft.FontWeight.BOLD, color=COLORS["primary"], 
+                    size=36, weight=ft.FontWeight.BOLD, color=COLORS["primary"],
                     font_family="Segoe UI",
                 ),
                 headline_medium=ft.TextStyle(
@@ -108,7 +91,7 @@ class ZZZGachaApp:
             ),
         )
 
-    def _build_ui(self):
+    def _build_ui(self) -> None:
         """Сборка интерфейса."""
         self._build_wish_tab()
         self._build_pull_tab()
@@ -117,7 +100,6 @@ class ZZZGachaApp:
         title = ft.Container(
             content=ft.Stack(
                 controls=[
-                    # Свечение позади текста
                     ft.Container(
                         content=ft.Text(
                             "⚡ ZZZ WISH SIMULATOR ⚡",
@@ -128,7 +110,6 @@ class ZZZGachaApp:
                         ),
                         blur=ft.Blur(10, 10, ft.BlurTileMode.MIRROR),
                     ),
-                    # Основной текст
                     ft.Text(
                         "⚡ ZZZ WISH SIMULATOR ⚡",
                         size=30,
@@ -243,12 +224,10 @@ class ZZZGachaApp:
             ),
         )
 
-        # Центрируем всё на странице
         self.page.add(main_column)
 
-    def _build_wish_tab(self):
+    def _build_wish_tab(self) -> None:
         """Сборка вкладки калькулятора шансов."""
-        # Поля ввода с неоновым стилем
         self.pity_field = self._create_neon_textfield(
             label="ТЕКУЩИЙ ПИТИ (0-89)",
             value=str(self.wish_settings.get("pity", 30)),
@@ -281,7 +260,6 @@ class ZZZGachaApp:
             hint="Минимальное количество копий для расчёта",
         )
 
-        # Кнопка расчёта с неоновым эффектом
         self.wish_calc_button = self._create_neon_button(
             text="РАССЧИТАТЬ ШАНС",
             on_click=self._on_wish_calculate,
@@ -289,7 +267,6 @@ class ZZZGachaApp:
             icon=ft.Icons.CALCULATE,
         )
 
-        # Поля для результатов
         self.wish_result_text = ft.Text(
             "",
             size=28,
@@ -313,7 +290,6 @@ class ZZZGachaApp:
             text_align=ft.TextAlign.CENTER,
         )
 
-        # Карточка для результата с неоновой рамкой
         wish_result_card = ft.Container(
             content=ft.Column(
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -346,7 +322,6 @@ class ZZZGachaApp:
         )
         self.wish_result_card = wish_result_card
 
-        # Подзаголовок
         subtitle = ft.Container(
             content=ft.Column(
                 spacing=4,
@@ -369,10 +344,8 @@ class ZZZGachaApp:
             padding=ft.Padding(0, 0, 0, 10),
         )
 
-        # Декоративный разделитель
         divider = self._create_neon_divider()
 
-        # Контент вкладки
         self.wish_tab_content = ft.Container(
             content=ft.Column(
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -408,13 +381,13 @@ class ZZZGachaApp:
             border_width=1.5,
             focused_border_width=2,
             label_style=ft.TextStyle(
-                color=COLORS["text_secondary"], 
-                size=11, 
+                color=COLORS["text_secondary"],
+                size=11,
                 weight=ft.FontWeight.W_500,
             ),
             text_style=ft.TextStyle(
-                color=COLORS["text"], 
-                size=16, 
+                color=COLORS["text"],
+                size=16,
                 weight=ft.FontWeight.W_500,
             ),
             hint_text=hint,
@@ -424,14 +397,14 @@ class ZZZGachaApp:
             cursor_color=COLORS["primary"],
             selection_color=COLORS["primary_glow"],
         )
-        
+
         return ft.Container(
             content=textfield,
             animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
             on_hover=lambda e: self._on_textfield_hover(e, textfield),
         )
 
-    def _on_textfield_hover(self, e, textfield):
+    def _on_textfield_hover(self, e: ft.ControlEvent, textfield: ft.TextField) -> None:
         """Эффект при наведении на текстовое поле."""
         if e.data == "true":
             textfield.border_color = COLORS["secondary_dim"]
@@ -443,7 +416,8 @@ class ZZZGachaApp:
             textfield.bgcolor = COLORS["bg_secondary"]
         textfield.update()
 
-    def _create_neon_button(self, text: str, on_click, width: int, icon=None) -> ft.Container:
+    def _create_neon_button(self, text: str, on_click: ft.ControlEvent | None, width: int,
+                            icon: ft.IconData | None = None) -> ft.Container:
         """Создает кнопку в неоновом киберпанк стиле."""
         button_content = ft.Row(
             alignment=ft.MainAxisAlignment.CENTER,
@@ -458,7 +432,7 @@ class ZZZGachaApp:
                 ),
             ],
         )
-        
+
         button = ft.ElevatedButton(
             content=button_content,
             on_click=on_click,
@@ -475,18 +449,17 @@ class ZZZGachaApp:
                 animation_duration=200,
             ),
         )
-        
-        # Обертка для эффектов наведения
+
         container = ft.Container(
             content=button,
             border_radius=12,
             animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
             on_hover=lambda e: self._on_button_hover(e, button, container),
         )
-        
+
         return container
 
-    def _on_button_hover(self, e, button, container):
+    def _on_button_hover(self, e: ft.ControlEvent, button: ft.ElevatedButton, container: ft.Container) -> None:
         """Эффект наведения на неоновую кнопку."""
         if e.data == "true":
             container.shadow = ft.BoxShadow(
@@ -560,7 +533,7 @@ class ZZZGachaApp:
             padding=ft.Padding(0, 8, 0, 8),
         )
 
-    def _on_wish_calculate(self, e):
+    def _on_wish_calculate(self, e: ft.ControlEvent) -> None:
         """Обработчик расчёта шансов."""
         try:
             pity = int(self.pity_field.content.value)
@@ -588,7 +561,6 @@ class ZZZGachaApp:
 
             self.wish_result_text.color = COLORS["success"]
 
-            # Дополнительная информация
             dist = calc.get_distribution(pulls)
             if pulls <= 20:
                 lines = [f"k={i}: {p*100:.2f}%" for i, p in enumerate(dist) if p > 0.0001]
@@ -610,7 +582,7 @@ class ZZZGachaApp:
             self.wish_result_card.visible = True
             self.page.update()
 
-    def _on_pull_calculate(self, e):
+    def _on_pull_calculate(self, e: ft.ControlEvent) -> None:
         """Обработчик расчёта круток."""
         try:
             current_pulls = int(self.pull_current_pulls.content.value)
@@ -647,7 +619,6 @@ class ZZZGachaApp:
             self.pull_result_text.value = f"🎯 ИТОГО КРУТОК: {result.total_pulls}"
             self.pull_result_text.color = COLORS["success"]
 
-            # Подробная разбивка
             breakdown = calc.get_detailed_breakdown()
             lines = [f"{k}: {v}" for k, v in breakdown.items()]
             self.pull_result_details.value = "\n".join(lines)
@@ -661,9 +632,8 @@ class ZZZGachaApp:
             self.pull_result_card.visible = True
             self.page.update()
 
-    def _build_pull_tab(self):
+    def _build_pull_tab(self) -> None:
         """Сборка вкладки калькулятора круток."""
-        # Поля ввода текущих ресурсов
         self.pull_current_pulls = self._create_neon_textfield(
             label="ТЕКУЩИЕ КРУТКИ",
             value=str(self.pull_settings.get("current_pulls", 0)),
@@ -699,7 +669,6 @@ class ZZZGachaApp:
             hint="Период прогноза в днях",
         )
 
-        # Кнопка расчёта
         self.pull_calc_button = self._create_neon_button(
             text="РАССЧИТАТЬ КРУТКИ",
             on_click=self._on_pull_calculate,
@@ -707,7 +676,6 @@ class ZZZGachaApp:
             icon=ft.Icons.ANALYTICS,
         )
 
-        # Поля для результатов
         self.pull_result_text = ft.Text(
             "",
             size=28,
@@ -732,7 +700,6 @@ class ZZZGachaApp:
             font_family="Consolas, monospace",
         )
 
-        # Карточка для результата
         pull_result_card = ft.Container(
             content=ft.Column(
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -765,7 +732,6 @@ class ZZZGachaApp:
         )
         self.pull_result_card = pull_result_card
 
-        # Подзаголовок
         subtitle = ft.Container(
             content=ft.Column(
                 spacing=4,
@@ -788,7 +754,6 @@ class ZZZGachaApp:
             padding=ft.Padding(0, 0, 0, 10),
         )
 
-        # Курсы обмена с неоновым стилем
         rates_info = ft.Container(
             content=ft.Column(
                 spacing=8,
@@ -827,7 +792,6 @@ class ZZZGachaApp:
 
         divider = self._create_neon_divider()
 
-        # Контент вкладки
         self.pull_tab_content = ft.Container(
             content=ft.Column(
                 alignment=ft.MainAxisAlignment.CENTER,

@@ -9,5 +9,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    # Запуск с использованием актуального ft.run() для Flet 0.85.3
     ft.run(main)

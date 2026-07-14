@@ -6,10 +6,10 @@ from typing import Optional
 @dataclass
 class Currency:
     """Текущие ресурсы игрока."""
-    pulls: int = 0           # Крутки
-    polychromes: int = 0     # Полихромы
-    monochromes: int = 0     # Монохромы
-    subscription_days: int = 0  # Остаток дней подписки
+    pulls: int = 0
+    polychromes: int = 0
+    monochromes: int = 0
+    subscription_days: int = 0
 
 
 @dataclass
@@ -46,20 +46,22 @@ class ZZZPullCalculator:
     - 1 монохром = 1 полихром (1:1)
     """
 
-    POLYCHROMES_PER_PULL = 160
-    DAILY_TASK_POLYCHROMES = 60
-    SUBSCRIPTION_POLYCHROMES_PER_DAY = 90
-    MONTHLY_SHOP_PULLS = 5
-    WEEKLY_MISSION_POLYCHROMES = 420
-    ZERO_HOLLOW_POLYCHROMES = 160
+    POLYCHROMES_PER_PULL: int = 160
+    DAILY_TASK_POLYCHROMES: int = 60
+    SUBSCRIPTION_POLYCHROMES_PER_DAY: int = 90
+    MONTHLY_SHOP_PULLS: int = 5
+    WEEKLY_MISSION_POLYCHROMES: int = 420
+    ZERO_HOLLOW_POLYCHROMES: int = 160
 
-    def __init__(self, 
-                 current_pulls: int = 0,
-                 current_polychromes: int = 0,
-                 current_monochromes: int = 0,
-                 subscription_days: int = 0,
-                 days: int = 30,
-                 start_date: Optional[date] = None):
+    def __init__(
+            self,
+            current_pulls: int = 0,
+            current_polychromes: int = 0,
+            current_monochromes: int = 0,
+            subscription_days: int = 0,
+            days: int = 30,
+            start_date: Optional[date] = None,
+    ) -> None:
         """
         :param current_pulls: Текущее количество круток
         :param current_polychromes: Текущее количество полихромов
@@ -78,42 +80,35 @@ class ZZZPullCalculator:
             raise ValueError("subscription_days must be non-negative")
         if days < 0:
             raise ValueError("days must be non-negative")
-        
-        self.currency = Currency(
+
+        self.currency: Currency = Currency(
             pulls=current_pulls,
             polychromes=current_polychromes,
             monochromes=current_monochromes,
-            subscription_days=subscription_days
+            subscription_days=subscription_days,
         )
-        self.start_date = start_date or date.today()
-        self.days = days
-        self.end_date = self.start_date + timedelta(days=days)
+        self.start_date: date = start_date or date.today()
+        self.days: int = days
+        self.end_date: date = self.start_date + timedelta(days=days)
 
     def calculate(self) -> PullCalculationResult:
         """Рассчитывает общее количество круток за указанный период."""
-        # Крутки из текущих ресурсов
         from_current_pulls = self.currency.pulls
         from_current_polychromes = self.currency.polychromes // self.POLYCHROMES_PER_PULL
         from_current_monochromes = self.currency.monochromes // self.POLYCHROMES_PER_PULL
 
-        # Полихромы от ежедневных заданий
         daily_task_polychromes = self.DAILY_TASK_POLYCHROMES * self.days
 
-        # Полихромы от подписки (учитываем только оставшиеся дни подписки)
         subscription_days = min(self.currency.subscription_days, self.days)
         subscription_polychromes = self.SUBSCRIPTION_POLYCHROMES_PER_DAY * subscription_days
 
-        # Полихромы от еженедельных заданий
         weeks = self._count_weeks()
         weekly_mission_polychromes = self.WEEKLY_MISSION_POLYCHROMES * weeks
 
-        # Полихромы от нулевой каверны
         zero_hollow_polychromes = self.ZERO_HOLLOW_POLYCHROMES * weeks
 
-        # Крутки из ежемесячного магазина (1 числа каждого месяца)
         monthly_shop_pulls = self._count_monthly_shop_pulls()
 
-        # Общее количество полихромов, полученных за период
         total_polychromes_earned = (
             daily_task_polychromes +
             subscription_polychromes +
@@ -121,17 +116,14 @@ class ZZZPullCalculator:
             zero_hollow_polychromes
         )
 
-        # Все доступные полихромы (текущие + монохромы 1:1 + заработанные)
         total_polychromes_available = (
             self.currency.polychromes +
             self.currency.monochromes +
             total_polychromes_earned
         )
 
-        # Общее количество круток из всех полихромов
         total_pulls_from_polychromes = total_polychromes_available // self.POLYCHROMES_PER_PULL
 
-        # Итого круток
         total_pulls = (
             from_current_pulls +
             total_pulls_from_polychromes +
@@ -151,7 +143,7 @@ class ZZZPullCalculator:
             from_subscription_polychromes=subscription_polychromes,
             total_polychromes_earned=total_polychromes_earned,
             total_monochromes_used=min(self.currency.monochromes, total_polychromes_earned + self.currency.polychromes),
-            days_calculated=self.days
+            days_calculated=self.days,
         )
 
     def _count_weeks(self) -> int:
@@ -162,16 +154,15 @@ class ZZZPullCalculator:
         """Подсчитывает количество круток из ежемесячного магазина (1 число каждого месяца)."""
         pulls = 0
         current = self.start_date
-        
-        # Проверяем каждое 1-е число месяца в периоде
+
         while current <= self.end_date:
             if current.day == 1:
                 pulls += self.MONTHLY_SHOP_PULLS
             current += timedelta(days=1)
-        
+
         return pulls
 
-    def get_detailed_breakdown(self) -> dict:
+    def get_detailed_breakdown(self) -> dict[str, int]:
         """Возвращает подробную разбивку по источникам."""
         result = self.calculate()
         return {
