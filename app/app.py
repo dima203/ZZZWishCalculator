@@ -1,6 +1,6 @@
 import flet as ft
 
-from core import ZZZGachaCalculator, ZZZPullCalculator
+from core import ZZZGachaCalculator, ZZZPullCalculator, storage
 
 
 # ZZZ (Zenless Zone Zero) Cyberpunk/Neon Color Palette
@@ -57,8 +57,14 @@ class ZZZGachaApp:
 
     def __init__(self, page: ft.Page):
         self.page = page
+        self._load_settings()
         self._setup_page()
         self._build_ui()
+
+    def _load_settings(self):
+        """Загружает сохраненные настройки."""
+        self.wish_settings = storage.get_wish_settings()
+        self.pull_settings = storage.get_pull_settings()
 
     def _setup_page(self):
         """Настройка страницы: заголовок, размер, тема."""
@@ -245,7 +251,7 @@ class ZZZGachaApp:
         # Поля ввода с неоновым стилем
         self.pity_field = self._create_neon_textfield(
             label="ТЕКУЩИЙ ПИТИ (0-89)",
-            value="30",
+            value=str(self.wish_settings.get("pity", 30)),
             width=320,
             hint="Сколько круток после последнего легендарного",
         )
@@ -253,7 +259,7 @@ class ZZZGachaApp:
         self.guarantee_switch = ft.Container(
             content=ft.Switch(
                 label="ГАРАНТ ИВЕНТОВОГО ПЕРСОНАЖА АКТИВЕН",
-                value=False,
+                value=self.wish_settings.get("guarantee", False),
                 active_color=COLORS["primary"],
                 inactive_thumb_color=COLORS["text_muted"],
                 inactive_track_color=COLORS["card_bg"],
@@ -263,14 +269,14 @@ class ZZZGachaApp:
 
         self.pulls_field = self._create_neon_textfield(
             label="КОЛИЧЕСТВО КРУТОК (N)",
-            value="50",
+            value=str(self.wish_settings.get("pulls", 50)),
             width=320,
             hint="Сколько круток планируете сделать",
         )
 
         self.copies_field = self._create_neon_textfield(
             label="ЖЕЛАЕМОЕ КОЛИЧЕСТВО КОПИЙ (K)",
-            value="1",
+            value=str(self.wish_settings.get("copies", 1)),
             width=320,
             hint="Минимальное количество копий для расчёта",
         )
@@ -569,6 +575,8 @@ class ZZZGachaApp:
                 self.page.update()
                 return
 
+            storage.save_wish_settings(pity, guarantee, pulls, k)
+
             calc = ZZZGachaCalculator(current_pity=pity, guarantee=guarantee)
 
             if k == 0:
@@ -618,6 +626,14 @@ class ZZZGachaApp:
                 self.page.update()
                 return
 
+            storage.save_pull_settings(
+                current_pulls,
+                current_polychromes,
+                current_monochromes,
+                subscription_days,
+                days,
+            )
+
             calc = ZZZPullCalculator(
                 current_pulls=current_pulls,
                 current_polychromes=current_polychromes,
@@ -650,35 +666,35 @@ class ZZZGachaApp:
         # Поля ввода текущих ресурсов
         self.pull_current_pulls = self._create_neon_textfield(
             label="ТЕКУЩИЕ КРУТКИ",
-            value="0",
+            value=str(self.pull_settings.get("current_pulls", 0)),
             width=320,
             hint="Количество готовых круток",
         )
 
         self.pull_current_polychromes = self._create_neon_textfield(
             label="ТЕКУЩИЕ ПОЛИХРОМЫ",
-            value="0",
+            value=str(self.pull_settings.get("current_polychromes", 0)),
             width=320,
             hint="Полихромы в инвентаре",
         )
 
         self.pull_current_monochromes = self._create_neon_textfield(
             label="ТЕКУЩИЕ МОНОХРОМЫ",
-            value="0",
+            value=str(self.pull_settings.get("current_monochromes", 0)),
             width=320,
             hint="Монохромы в инвентаре",
         )
 
         self.pull_subscription_days = self._create_neon_textfield(
             label="ОСТАТОК ДНЕЙ ПОДПИСКИ",
-            value="0",
+            value=str(self.pull_settings.get("subscription_days", 0)),
             width=320,
             hint="Дней до окончания Интервью/подписки",
         )
 
         self.pull_days = self._create_neon_textfield(
             label="ДНЕЙ ДЛЯ РАСЧЁТА",
-            value="30",
+            value=str(self.pull_settings.get("days", 30)),
             width=320,
             hint="Период прогноза в днях",
         )
