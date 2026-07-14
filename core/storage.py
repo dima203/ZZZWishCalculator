@@ -3,8 +3,14 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-CONFIG_DIR = Path.home() / ".zzz_wish_calculator"
-CONFIG_FILE = CONFIG_DIR / "settings.json"
+def _get_config_dir() -> Path:
+    """Возвращает директорию конфигурации."""
+    return Path.home() / ".zzz_wish_calculator"
+
+
+def _get_config_file() -> Path:
+    """Возвращает путь к файлу настроек."""
+    return _get_config_dir() / "settings.json"
 
 DEFAULT_SETTINGS = {
     "wish": {
@@ -25,17 +31,18 @@ DEFAULT_SETTINGS = {
 
 def ensure_config_dir() -> None:
     """Создает директорию конфигурации, если её нет."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _get_config_dir().mkdir(parents=True, exist_ok=True)
 
 
 def load_settings() -> Dict[str, Any]:
     """Загружает настройки из файла."""
     ensure_config_dir()
-    if not CONFIG_FILE.exists():
+    config_file = _get_config_file()
+    if not config_file.exists():
         return DEFAULT_SETTINGS.copy()
     
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         
         # Объединяем с дефолтами на случай новых полей
@@ -53,8 +60,9 @@ def load_settings() -> Dict[str, Any]:
 def save_settings(settings: Dict[str, Any]) -> bool:
     """Сохраняет настройки в файл."""
     ensure_config_dir()
+    config_file = _get_config_file()
     try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(settings, f, ensure_ascii=False, indent=2)
         return True
     except IOError:
