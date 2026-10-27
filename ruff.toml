@@ -1,0 +1,57 @@
+# Ruff-конфигурация ZZZWishCalculator.
+# Запуск из корня: .\.venv\Scripts\ruff.exe check . && .\.venv\Scripts\ruff.exe format .
+# Стиль подавлений — имена правил (не коды).
+
+extend-exclude = ["*.md", ".venv", "tools/screenshots"]
+
+target-version = "py312"
+line-length = 120
+indent-width = 4
+
+[lint]
+preview = true
+select = [
+    "UP",   # pyupgrade
+    "I",    # isort
+    "E",    # flake8-errors
+    "W",    # flake8-warnings
+    "F",    # flake8-pyflakes
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "S",    # flake8-bandit
+    "BLE",  # flake8-blind-except
+    "T20",  # flake8-print
+    "T10",  # flake8-debugger
+    "PT",   # flake8-pytest-style
+    "RUF",  # Ruff
+    "DTZ",  # flake8-datetimez
+    "ERA",  # eradicate
+    "FURB", # refurb
+]
+ignore = [
+    "unnecessary-collection-call",            # C408
+    "ambiguous-unicode-character-string",     # RUF001: кириллица в UI-строках
+    "ambiguous-unicode-character-docstring",  # RUF002
+    "ambiguous-unicode-character-comment",    # RUF003
+    "call-date-today",                        # DTZ011: локальные даты — часть механики
+    "invalid-module-name",                    # N999: имя пакета core/app унаследовано
+]
+
+[lint.per-file-ignores]
+# Тесты: assert и unittest-стиль — норма; точные float-сравнения осмысленны.
+"tests/**" = [
+    "assert",
+    "float-equality-comparison",
+    "pytest-unittest-assertion",
+    "pytest-unittest-raises-assertion",
+    "pytest-raises-too-broad",
+    "commented-out-code",
+]
+# CLI-утилита печатает прогресс и намеренно продолжает после сбоя одного таба.
+"tools/screenshots.py" = ["T20", "blind-except", "module-import-not-at-top-of-file"]
+# Точка входа: ft.run(main) — публичный контракт Flet, не «модульный» импорт.
+"main.py" = ["module-import-not-at-top-of-file"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

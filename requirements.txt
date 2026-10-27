@@ -1,0 +1,3 @@
+# Runtime-зависимости ZZZWishCalculator (Python 3.12).
+flet==1.0.5
+flet-desktop==1.0.5

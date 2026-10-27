@@ -58,10 +58,10 @@ class ZZZGachaApp:
         self.page.padding = 30
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.bgcolor = COLORS["bg"]
-        self.page.window_width = 520
-        self.page.window_height = 720
-        self.page.window_min_width = 480
-        self.page.window_min_height = 600
+        self.page.window.width = 520
+        self.page.window.height = 720
+        self.page.window.min_width = 480
+        self.page.window.min_height = 600
 
         self.page.theme = ft.Theme(
             color_scheme=ft.ColorScheme(
@@ -77,17 +77,15 @@ class ZZZGachaApp:
             ),
             text_theme=ft.TextTheme(
                 headline_large=ft.TextStyle(
-                    size=36, weight=ft.FontWeight.BOLD, color=COLORS["primary"],
+                    size=36,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLORS["primary"],
                     font_family="Segoe UI",
                 ),
-                headline_medium=ft.TextStyle(
-                    size=20, weight=ft.FontWeight.W_600, color=COLORS["text"]
-                ),
+                headline_medium=ft.TextStyle(size=20, weight=ft.FontWeight.W_600, color=COLORS["text"]),
                 body_large=ft.TextStyle(size=16, color=COLORS["text"]),
                 body_medium=ft.TextStyle(size=14, color=COLORS["text_secondary"]),
-                label_large=ft.TextStyle(
-                    size=16, weight=ft.FontWeight.BOLD, color=COLORS["bg"]
-                ),
+                label_large=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD, color=COLORS["bg"]),
             ),
         )
 
@@ -375,11 +373,7 @@ class ZZZGachaApp:
             height=56,
             keyboard_type=ft.KeyboardType.NUMBER,
             input_filter=ft.NumbersOnlyInputFilter(),
-            border_color=COLORS["border"],
-            focused_border_color=COLORS["primary"],
-            border_radius=10,
-            border_width=1.5,
-            focused_border_width=2,
+            border=self._input_border(COLORS["border"]),
             label_style=ft.TextStyle(
                 color=COLORS["text_secondary"],
                 size=11,
@@ -404,20 +398,33 @@ class ZZZGachaApp:
             on_hover=lambda e: self._on_textfield_hover(e, textfield),
         )
 
+    @staticmethod
+    def _input_border(color: str, width: float = 1.5) -> dict[ft.ControlState, ft.OutlineInputBorder]:
+        """Рамка поля ввода: обычное и фокусированное состояние (Flet 1.0)."""
+        return {
+            ft.ControlState.DEFAULT: ft.OutlineInputBorder(
+                border_radius=10,
+                side=ft.BorderSide(width, color),
+            ),
+            ft.ControlState.FOCUSED: ft.OutlineInputBorder(
+                border_radius=10,
+                side=ft.BorderSide(2, COLORS["primary"]),
+            ),
+        }
+
     def _on_textfield_hover(self, e: ft.ControlEvent, textfield: ft.TextField) -> None:
         """Эффект при наведении на текстовое поле."""
         if e.data == "true":
-            textfield.border_color = COLORS["secondary_dim"]
-            textfield.border_width = 1.5
+            textfield.border = self._input_border(COLORS["secondary_dim"])
             textfield.bgcolor = COLORS["card_bg"]
         else:
-            textfield.border_color = COLORS["border"]
-            textfield.border_width = 1.5
+            textfield.border = self._input_border(COLORS["border"])
             textfield.bgcolor = COLORS["bg_secondary"]
         textfield.update()
 
-    def _create_neon_button(self, text: str, on_click: ft.ControlEvent | None, width: int,
-                            icon: ft.IconData | None = None) -> ft.Container:
+    def _create_neon_button(
+        self, text: str, on_click: ft.ControlEvent | None, width: int, icon: ft.IconData | None = None
+    ) -> ft.Container:
         """Создает кнопку в неоновом киберпанк стиле."""
         button_content = ft.Row(
             alignment=ft.MainAxisAlignment.CENTER,
@@ -433,7 +440,7 @@ class ZZZGachaApp:
             ],
         )
 
-        button = ft.ElevatedButton(
+        button = ft.Button(
             content=button_content,
             on_click=on_click,
             width=width,
@@ -459,7 +466,7 @@ class ZZZGachaApp:
 
         return container
 
-    def _on_button_hover(self, e: ft.ControlEvent, button: ft.ElevatedButton, container: ft.Container) -> None:
+    def _on_button_hover(self, e: ft.ControlEvent, button: ft.Button, container: ft.Container) -> None:
         """Эффект наведения на неоновую кнопку."""
         if e.data == "true":
             container.shadow = ft.BoxShadow(
@@ -554,23 +561,22 @@ class ZZZGachaApp:
 
             if k == 0:
                 prob = calc.probability_at_least_one(pulls)
-                self.wish_result_text.value = f"ШАНС ≥1 КОПИИ: {prob*100:.2f}%"
+                self.wish_result_text.value = f"ШАНС ≥1 КОПИИ: {prob * 100:.2f}%"
             else:
                 prob = calc.probability_k(pulls, k)
-                self.wish_result_text.value = f"ШАНС ≥{k} КОПИЙ: {prob*100:.2f}%"
+                self.wish_result_text.value = f"ШАНС ≥{k} КОПИЙ: {prob * 100:.2f}%"
 
             self.wish_result_text.color = COLORS["success"]
 
             dist = calc.get_distribution(pulls)
             if pulls <= 20:
-                lines = [f"k={i}: {p*100:.2f}%" for i, p in enumerate(dist) if p > 0.0001]
+                lines = [f"k={i}: {p * 100:.2f}%" for i, p in enumerate(dist) if p > 0.0001]
                 self.wish_result_details.value = "ПОЛНОЕ РАСПРЕДЕЛЕНИЕ:\n" + "\n".join(lines)
             else:
                 at_least_1 = 1.0 - dist[0]
                 at_least_2 = 1.0 - (dist[0] + dist[1]) if len(dist) > 1 else 0.0
                 self.wish_result_details.value = (
-                    f"ХОТЯ БЫ 1: {at_least_1*100:.2f}%\n"
-                    f"ХОТЯ БЫ 2: {at_least_2*100:.2f}%"
+                    f"ХОТЯ БЫ 1: {at_least_1 * 100:.2f}%\nХОТЯ БЫ 2: {at_least_2 * 100:.2f}%"
                 )
 
             self.wish_result_card.visible = True

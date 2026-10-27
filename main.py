@@ -5,7 +5,7 @@ from app import ZZZGachaApp
 
 def main(page: ft.Page):
     # Инициализация приложения с передачей страницы
-    app = ZZZGachaApp(page)
+    ZZZGachaApp(page)
 
 
 if __name__ == "__main__":

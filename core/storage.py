@@ -43,7 +43,7 @@ def load_settings() -> dict[str, Any]:
         return DEFAULT_SETTINGS.copy()
 
     try:
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             data = json.load(f)
 
         result = DEFAULT_SETTINGS.copy()
@@ -53,7 +53,7 @@ def load_settings() -> dict[str, Any]:
             else:
                 result[key] = value
         return result
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return DEFAULT_SETTINGS.copy()
 
 
@@ -65,7 +65,7 @@ def save_settings(settings: dict[str, Any]) -> bool:
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(settings, f, ensure_ascii=False, indent=2)
         return True
-    except IOError:
+    except OSError:
         return False
 
 
