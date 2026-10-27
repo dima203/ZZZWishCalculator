@@ -145,7 +145,35 @@ GET https://sg-hyp-api.hoyoverse.com/hyp/hyp-connect/api/getGameContent
 - ZZZ Poly Calculator: https://zzz-poly-cal.vercel.app/
 - Lootbar, 2.7 pull count: https://lootbar.gg/blog/en/zenless-zone-zero-2-7-pull-count.html
 
-## 5. Вывод
+## 5. Пробный прогон 2026-10-27
+
+Скрипт: `tools/events_probe.py` (только чтение, без записи настроек).
+
+```bash
+.\.venv\Scripts\python.exe tools\events_probe.py --details
+```
+
+Запрос: `gids=8`, по 8 публикаций из `type=1` и `type=2`, фильтр официального аккаунта.
+Получено 16 официальных публикаций. Примеры:
+
+| Публикация | Event Duration |
+|------------|----------------|
+| "Cyber Miracle Healer, on Duty!" Event Details | 2026/10/28 10:00 – 2026/11/16 03:59 (server time) |
+| "Spooky Funhouse Tales" Event Details | 2026/10/22 10:00 – 2026/11/30 03:59 (server time) |
+| "All-New Program" Event Details | After the Version 3.3 update – 2026/12/01 03:59 (server time) |
+| Version 3.3 New Eridu City Fund Details | After the Version 3.3 update – 2026/11/30 03:59 (server time) |
+| "Arm Wrestle with Roxy" | October 2 – October 8 |
+| "Vyrium Vacation Album" | September 9 – October 10 |
+
+Наблюдения:
+
+- `Event Duration` есть не у всех публикаций; для части новостей/патчноутов поле отсутствует.
+- Формат дат разный: `YYYY/MM/DD HH:MM (server time)`, `October 2 – October 8`, `After the update – …`.
+  Нужен нормализатор и ручная проверка, автоматически доверять нельзя.
+- Часть старых событий уже завершилась; при интеграции нужно фильтровать по `event_end`/текущей дате.
+- `type=2` содержит не только игровые ивенты, но и розыгрыши/Twitch Drops/веб-активности.
+
+## 6. Вывод
 
 Для автоматического обнаружения ивентов лучший компромисс — **официальный аккаунт ZZZ на HoYoLAB**
 через `getNewsList?gids=8` + `getPostFull` с фильтром `uid=219270333` и кэшем.

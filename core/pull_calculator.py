@@ -17,6 +17,8 @@ class PullCalculationResult:
     """Результат расчёта количества круток за период."""
 
     total_pulls: int
+    total_pulls_min: int
+    total_pulls_max: int
     from_current_pulls: int
     from_current_polychromes: int
     from_current_monochromes: int
@@ -29,6 +31,7 @@ class PullCalculationResult:
     from_deadly_assault: int
     from_subscription_polychromes: int
     total_polychromes_earned: int
+    total_polychromes_earned_min: int
     total_monochromes_used: int
     days_calculated: int
 
@@ -42,9 +45,12 @@ class ZZZPullCalculator:
     2. Подписка — 90 полихромов в день (учитывается оставшиеся дни подписки)
     3. Ridu Weekly — 60 полихромов в неделю
     4. Hollow Zero — 160 полихромов в неделю
-    5. Shiyu Defense: Critical Node — 780 полихромов за 14-дневную ротацию
-    6. Deadly Assault — 300 полихромов за 14-дневную ротацию
+    5. Shiyu Defense: Critical Node — до 780 полихромов за 14-дневную ротацию
+    6. Deadly Assault — до 300 полихромов за 14-дневную ротацию
     7. Ежемесячный Signal Shop — 5 круток 1 числа (за Residual Signal)
+
+    Shiyu Defense и Deadly Assault дают диапазон: нижняя граница — без эндгейма,
+    верхняя — при полном клире обеих ротаций.
 
     Конвертация:
     - 1 крутка = 160 полихромов
@@ -119,23 +125,25 @@ class ZZZPullCalculator:
 
         monthly_shop_pulls = self._count_monthly_shop_pulls()
 
-        total_polychromes_earned = (
-            daily_task_polychromes
-            + subscription_polychromes
-            + ridu_weekly_polychromes
-            + hollow_zero_polychromes
-            + shiyu_defense_polychromes
-            + deadly_assault_polychromes
+        base_polychromes_earned = (
+            daily_task_polychromes + subscription_polychromes + ridu_weekly_polychromes + hollow_zero_polychromes
         )
+        endgame_polychromes = shiyu_defense_polychromes + deadly_assault_polychromes
+        total_polychromes_earned = base_polychromes_earned + endgame_polychromes
 
-        total_polychromes_available = self.currency.polychromes + self.currency.monochromes + total_polychromes_earned
+        max_polychromes_available = self.currency.polychromes + self.currency.monochromes + total_polychromes_earned
+        min_polychromes_available = self.currency.polychromes + self.currency.monochromes + base_polychromes_earned
 
-        total_pulls_from_polychromes = total_polychromes_available // self.POLYCHROMES_PER_PULL
+        max_pulls_from_polychromes = max_polychromes_available // self.POLYCHROMES_PER_PULL
+        min_pulls_from_polychromes = min_polychromes_available // self.POLYCHROMES_PER_PULL
 
-        total_pulls = from_current_pulls + total_pulls_from_polychromes + monthly_shop_pulls
+        total_pulls_min = from_current_pulls + min_pulls_from_polychromes + monthly_shop_pulls
+        total_pulls_max = from_current_pulls + max_pulls_from_polychromes + monthly_shop_pulls
 
         return PullCalculationResult(
-            total_pulls=total_pulls,
+            total_pulls=total_pulls_max,
+            total_pulls_min=total_pulls_min,
+            total_pulls_max=total_pulls_max,
             from_current_pulls=from_current_pulls,
             from_current_polychromes=from_current_polychromes,
             from_current_monochromes=from_current_monochromes,
@@ -148,6 +156,7 @@ class ZZZPullCalculator:
             from_deadly_assault=deadly_assault_polychromes // self.POLYCHROMES_PER_PULL,
             from_subscription_polychromes=subscription_polychromes,
             total_polychromes_earned=total_polychromes_earned,
+            total_polychromes_earned_min=base_polychromes_earned,
             total_monochromes_used=min(self.currency.monochromes, total_polychromes_earned + self.currency.polychromes),
             days_calculated=self.days,
         )
@@ -183,10 +192,12 @@ class ZZZPullCalculator:
             "Подписка": result.from_subscription,
             "Ridu Weekly": result.from_ridu_weekly,
             "Hollow Zero": result.from_hollow_zero,
-            "Shiyu Defense": result.from_shiyu_defense,
-            "Deadly Assault": result.from_deadly_assault,
+            "Shiyu Defense (макс.)": result.from_shiyu_defense,
+            "Deadly Assault (макс.)": result.from_deadly_assault,
             "Ежемесячный магазин": result.from_monthly_shop,
             "Итого полихромов заработано": result.total_polychromes_earned,
-            "Итого круток": result.total_pulls,
+            "Итого полихромов без эндгейма": result.total_polychromes_earned_min,
+            "Итого круток (мин.)": result.total_pulls_min,
+            "Итого круток (макс.)": result.total_pulls_max,
             "Дней в расчёте": result.days_calculated,
         }

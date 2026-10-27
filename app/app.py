@@ -1,8 +1,9 @@
+import asyncio
 from typing import Any
 
 import flet as ft
 
-from core import ZZZGachaCalculator, ZZZPullCalculator, storage
+from core import BANNERS, ZZZGachaCalculator, ZZZPullCalculator, storage
 
 # ZZZ (Zenless Zone Zero) Cyberpunk/Neon Color Palette
 COLORS: dict[str, str] = {
@@ -34,6 +35,8 @@ class ZZZGachaApp:
         self.wish_settings: dict[str, Any]
         self.pull_settings: dict[str, Any]
         self._load_settings()
+        if self.banner not in BANNERS:
+            self.banner = "agent"
         self._setup_page()
         self._build_ui()
 
@@ -41,6 +44,7 @@ class ZZZGachaApp:
         """Загружает сохраненные настройки."""
         self.wish_settings = storage.get_wish_settings()
         self.pull_settings = storage.get_pull_settings()
+        self.banner: str = self.wish_settings.get("banner", "agent")
 
     def _setup_page(self) -> None:
         """Настройка страницы: заголовок, размер, тема."""
@@ -216,8 +220,13 @@ class ZZZGachaApp:
             padding=ft.Padding(0, 10, 0, 8),
         )
 
-    def _section_header(self, title: str, subtitle: str, icon: ft.IconData) -> ft.Control:
+    def _section_header(self, title: str, subtitle: str | ft.Control, icon: ft.IconData) -> ft.Control:
         """Заголовок секции с акцентной иконкой."""
+        subtitle_control = (
+            ft.Text(subtitle, size=9, color=COLORS["text_muted"], max_lines=1)
+            if isinstance(subtitle, str)
+            else subtitle
+        )
         return ft.Row(
             spacing=8,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -236,7 +245,7 @@ class ZZZGachaApp:
                     expand=True,
                     controls=[
                         ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color=COLORS["text"]),
-                        ft.Text(subtitle, size=9, color=COLORS["text_muted"], max_lines=1),
+                        subtitle_control,
                     ],
                 ),
             ],
@@ -260,10 +269,11 @@ class ZZZGachaApp:
 
     def _build_wish_tab(self) -> None:
         """Сборка вкладки калькулятора шансов."""
+        spec = BANNERS[self.banner]
         self.pity_field = self._create_neon_textfield(
-            label="ТЕКУЩИЙ ПИТИ",
+            label="КРУТОК БЕЗ S-РАНГА",
             value=str(self.wish_settings.get("pity", 30)),
-            hint="0–89",
+            hint=f"0–{spec.hard_pity - 1}",
             col={"xs": 6},
         )
 
@@ -281,6 +291,24 @@ class ZZZGachaApp:
             col={"xs": 6},
         )
 
+        self.banner_select = ft.SegmentedButton(
+            segments=[
+                ft.Segment(value="agent", label=ft.Text("АГЕНТ · 90")),
+                ft.Segment(value="w_engine", label=ft.Text("W-ENGINE · 80")),
+            ],
+            selected=[self.banner],
+            allow_multiple_selection=False,
+            show_selected_icon=False,
+            on_change=self._on_banner_change,
+            style=ft.ButtonStyle(
+                color=COLORS["text_secondary"],
+                bgcolor=COLORS["bg_secondary"],
+                shape=ft.RoundedRectangleBorder(radius=12),
+            ),
+            expand=True,
+        )
+
+        self.guarantee_hint = ft.Text("следующий S — ивент", size=9, color=COLORS["text_muted"])
         self.guarantee_switch = ft.Container(
             content=ft.Switch(
                 value=self.wish_settings.get("guarantee", False),
@@ -302,7 +330,7 @@ class ZZZGachaApp:
                         expand=True,
                         controls=[
                             ft.Text("ГАРАНТ", size=10, weight=ft.FontWeight.BOLD, color=COLORS["text"]),
-                            ft.Text("следующий S — ивент", size=9, color=COLORS["text_muted"]),
+                            self.guarantee_hint,
                         ],
                     ),
                     self.guarantee_switch,
@@ -319,6 +347,16 @@ class ZZZGachaApp:
             text="РАССЧИТАТЬ ШАНС",
             on_click=self._on_wish_calculate,
             icon=ft.Icons.AUTO_GRAPH,
+        )
+        self.wish_button = self.wish_calc_button.content.controls[0]
+        self.wish_progress = ft.Row(
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            visible=False,
+            controls=[
+                ft.ProgressRing(width=14, height=14, stroke_width=2, color=COLORS["primary"]),
+                ft.Text("СЧИТАЕМ...", size=9, color=COLORS["text_secondary"]),
+            ],
         )
 
         self.wish_result_text = ft.Text(
@@ -362,20 +400,36 @@ class ZZZGachaApp:
             ],
         )
 
+        self.wish_section_subtitle = ft.Text(
+            self._banner_subtitle(),
+            size=9,
+            color=COLORS["text_muted"],
+            max_lines=1,
+        )
+
         self.wish_tab_content = ft.Column(
             spacing=12,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             controls=[
                 self._section_header(
                     "ШАНС НА ИВЕНТ",
-                    "канал агентов · 50/50 · hard pity 90",
+                    self.wish_section_subtitle,
                     ft.Icons.CASINO,
                 ),
-                self._card(ft.Column(spacing=12, controls=[fields])),
+                self._card(
+                    ft.Column(
+                        spacing=12,
+                        controls=[
+                            self.banner_select,
+                            fields,
+                        ],
+                    )
+                ),
                 self.wish_calc_button,
+                self.wish_progress,
                 self.wish_result_card,
                 ft.Text(
-                    "Soft pity — оценка сообщества: ~74-я крутка, +6 п.п. за крутку.",
+                    "Soft pity — оценка сообщества: агент ~74-я, W-Engine ~65-я; +6 п.п. за крутку.",
                     size=9,
                     color=COLORS["text_muted"],
                     text_align=ft.TextAlign.CENTER,
@@ -386,13 +440,24 @@ class ZZZGachaApp:
 
     def _build_wish_stats(self) -> ft.Control:
         """Короткие ориентиры по pity под формой."""
+        self.wish_stat_hard = ft.Text(
+            "90", size=16, weight=ft.FontWeight.BOLD, color=COLORS["primary"], font_family="Consolas"
+        )
+        self.wish_stat_guarantee = ft.Text(
+            "180", size=16, weight=ft.FontWeight.BOLD, color=COLORS["secondary"], font_family="Consolas"
+        )
         return ft.Container(
             content=ft.Row(
                 spacing=8,
                 controls=[
-                    self._stat_tile("90", "HARD PITY", COLORS["primary"]),
-                    self._stat_tile("180", "ГАРАНТ ИВЕНТА", COLORS["secondary"]),
-                    self._stat_tile("0.6%", "БАЗА", COLORS["accent"]),
+                    self._stat_tile(self.wish_stat_hard, "HARD PITY"),
+                    self._stat_tile(self.wish_stat_guarantee, "ГАРАНТ ИВЕНТА"),
+                    self._stat_tile(
+                        ft.Text(
+                            "0.6%", size=16, weight=ft.FontWeight.BOLD, color=COLORS["accent"], font_family="Consolas"
+                        ),
+                        "БАЗА",
+                    ),
                 ],
             ),
             padding=10,
@@ -401,14 +466,14 @@ class ZZZGachaApp:
             border=ft.Border.all(1, COLORS["border"]),
         )
 
-    def _stat_tile(self, value: str, label: str, color: str) -> ft.Container:
+    def _stat_tile(self, value: ft.Text, label: str) -> ft.Container:
         """Мини-плитка со значением и подписью."""
         return ft.Container(
             content=ft.Column(
                 spacing=1,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
-                    ft.Text(value, size=16, weight=ft.FontWeight.BOLD, color=color, font_family="Consolas"),
+                    value,
                     ft.Text(label, size=8, color=COLORS["text_muted"], text_align=ft.TextAlign.CENTER),
                 ],
             ),
@@ -418,6 +483,30 @@ class ZZZGachaApp:
             border=ft.Border.all(1, COLORS["border"]),
             expand=True,
         )
+
+    def _banner_subtitle(self) -> str:
+        """Подпись выбранного канала."""
+        spec = BANNERS[self.banner]
+        rate = "50/50" if self.banner == "agent" else "75/25"
+        return f"канал {spec.label.upper()} · {rate} · hard pity {spec.hard_pity}"
+
+    def _on_banner_change(self, e: ft.ControlEvent | None) -> None:
+        """Переключает канал агента/W-Engine и обновляет подсказки."""
+        selected = self.banner_select.selected
+        if selected:
+            self.banner = selected[0]
+        if self.banner not in BANNERS:
+            self.banner = "agent"
+        spec = BANNERS[self.banner]
+
+        self.wish_section_subtitle.value = self._banner_subtitle()
+        self.guarantee_hint.value = "следующий S — ивент" if self.banner == "agent" else "следующий S — оружие"
+        self.pity_field.content.label = "КРУТОК БЕЗ S-РАНГА"
+        self.pity_field.content.hint_text = f"0–{spec.hard_pity - 1}"
+        self.wish_stat_hard.value = str(spec.hard_pity)
+        self.wish_stat_guarantee.value = str(spec.hard_pity * 2)
+        self.wish_result_card.visible = False
+        self.page.update()
 
     def _create_neon_textfield(
         self,
@@ -467,6 +556,7 @@ class ZZZGachaApp:
         value_text: ft.Text,
         details_text: ft.Text,
         bar: ft.ProgressBar | None = None,
+        hint: ft.Text | None = None,
     ) -> ft.Container:
         """Карточка результата, общая для обеих вкладок."""
         controls: list[ft.Control] = [
@@ -479,6 +569,8 @@ class ZZZGachaApp:
             ),
             value_text,
         ]
+        if hint is not None:
+            controls.append(hint)
         if bar is not None:
             controls.append(bar)
         controls.append(
@@ -648,28 +740,42 @@ class ZZZGachaApp:
         container.update()
         button.update()
 
-    def _on_wish_calculate(self, e: ft.ControlEvent) -> None:
-        """Обработчик расчёта шансов."""
+    async def _on_wish_calculate(self, e: ft.ControlEvent | None) -> None:
+        """Обработчик расчёта шансов с индикатором прогресса."""
+        self._set_busy(self.wish_button, self.wish_progress, True)
+        self.page.update()
+        await asyncio.sleep(0.15)
+        try:
+            self._calculate_wish()
+        finally:
+            self._set_busy(self.wish_button, self.wish_progress, False)
+            self.page.update()
+
+    def _calculate_wish(self) -> None:
+        """Считает шанс и обновляет карточку результата."""
         try:
             pity = int(self.pity_field.content.value)
             pulls = int(self.pulls_field.content.value)
             k = int(self.copies_field.content.value)
             guarantee = self.guarantee_switch.content.value
+            spec = BANNERS[self.banner]
 
-            if not (0 <= pity <= 89):
-                self._show_wish_error("⚠️ ОШИБКА: ПИТИ ОТ 0 ДО 89")
+            if not (0 <= pity < spec.hard_pity):
+                self._show_wish_error(f"⚠️ ОШИБКА: ПИТИ ОТ 0 ДО {spec.hard_pity - 1}")
                 return
 
-            storage.save_wish_settings(pity, guarantee, pulls, k)
+            storage.save_wish_settings(pity, guarantee, pulls, k, self.banner)
 
-            calc = ZZZGachaCalculator(current_pity=pity, guarantee=guarantee)
+            calc = ZZZGachaCalculator(current_pity=pity, guarantee=guarantee, banner=self.banner)
 
+            unit = "КОПИЙ" if self.banner == "agent" else "W-ENGINE"
             if k == 0:
                 prob = calc.probability_at_least_one(pulls)
-                self.wish_result_text.value = f"ШАНС ≥1 КОПИИ: {prob * 100:.2f}%"
+                one_unit = "КОПИИ" if self.banner == "agent" else "W-ENGINE"
+                self.wish_result_text.value = f"ШАНС ≥1 {one_unit}: {prob * 100:.2f}%"
             else:
                 prob = calc.probability_k(pulls, k)
-                self.wish_result_text.value = f"ШАНС ≥{k} КОПИЙ: {prob * 100:.2f}%"
+                self.wish_result_text.value = f"ШАНС ≥{k} {unit}: {prob * 100:.2f}%"
 
             self.wish_result_text.color = COLORS["success"]
             self.wish_result_bar.value = prob
@@ -698,6 +804,12 @@ class ZZZGachaApp:
         except ValueError:
             self._show_wish_error("⚠️ ВВЕДИТЕ КОРРЕКТНЫЕ ЧИСЛА")
 
+    @staticmethod
+    def _set_busy(button: ft.Button, progress: ft.Control, busy: bool) -> None:
+        """Блокирует кнопку и показывает/скрывает индикатор."""
+        button.disabled = busy
+        progress.visible = busy
+
     def _show_wish_error(self, message: str) -> None:
         """Показывает ошибку в карточке результата."""
         self.wish_result_text.value = message
@@ -714,8 +826,19 @@ class ZZZGachaApp:
         self.wish_result_card.visible = True
         self.page.update()
 
-    def _on_pull_calculate(self, e: ft.ControlEvent) -> None:
-        """Обработчик расчёта круток."""
+    async def _on_pull_calculate(self, e: ft.ControlEvent | None) -> None:
+        """Обработчик расчёта круток с индикатором прогресса."""
+        self._set_busy(self.pull_button, self.pull_progress, True)
+        self.page.update()
+        await asyncio.sleep(0.15)
+        try:
+            self._calculate_pull()
+        finally:
+            self._set_busy(self.pull_button, self.pull_progress, False)
+            self.page.update()
+
+    def _calculate_pull(self) -> None:
+        """Считает прогноз и обновляет карточку результата."""
         try:
             current_pulls = int(self.pull_current_pulls.content.value)
             current_polychromes = int(self.pull_current_polychromes.content.value)
@@ -745,7 +868,15 @@ class ZZZGachaApp:
 
             result = calc.calculate()
 
-            self.pull_result_text.value = f"🎯 ИТОГО КРУТОК: {result.total_pulls}"
+            if result.total_pulls_min == result.total_pulls_max:
+                total_text = str(result.total_pulls_max)
+                self.pull_result_hint.value = "эндгейм не входит в выбранный период"
+            else:
+                total_text = f"{result.total_pulls_min}–{result.total_pulls_max}"
+                self.pull_result_hint.value = (
+                    f"{result.total_pulls_min} — без эндгейма · {result.total_pulls_max} — полный клир"
+                )
+            self.pull_result_text.value = f"🎯 ИТОГО КРУТОК: {total_text}"
             self.pull_result_text.color = COLORS["success"]
             self.pull_result_card.border = ft.Border.all(1, COLORS["success"])
             self.pull_result_card.shadow = ft.BoxShadow(
@@ -820,6 +951,16 @@ class ZZZGachaApp:
             on_click=self._on_pull_calculate,
             icon=ft.Icons.TRENDING_UP,
         )
+        self.pull_button = self.pull_calc_button.content.controls[0]
+        self.pull_progress = ft.Row(
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            visible=False,
+            controls=[
+                ft.ProgressRing(width=14, height=14, stroke_width=2, color=COLORS["primary"]),
+                ft.Text("СЧИТАЕМ...", size=9, color=COLORS["text_secondary"]),
+            ],
+        )
 
         self.pull_result_text = ft.Text(
             "",
@@ -837,11 +978,13 @@ class ZZZGachaApp:
             text_align=ft.TextAlign.LEFT,
             font_family="Consolas",
         )
+        self.pull_result_hint = ft.Text("", size=10, color=COLORS["text_muted"], text_align=ft.TextAlign.CENTER)
         self.pull_result_card = self._build_result_card(
             title="ПРОГНОЗ",
             icon=ft.Icons.TRENDING_UP,
             value_text=self.pull_result_text,
             details_text=self.pull_result_details,
+            hint=self.pull_result_hint,
         )
 
         fields = ft.ResponsiveRow(
@@ -889,6 +1032,7 @@ class ZZZGachaApp:
                 ),
                 self._card(ft.Column(spacing=12, controls=[fields])),
                 self.pull_calc_button,
+                self.pull_progress,
                 self.pull_result_card,
                 self.rates_info,
             ],
@@ -916,7 +1060,7 @@ class ZZZGachaApp:
                 self._rate_row("SOFT PITY", "~74 · +6 П.П.", COLORS["warning"]),
                 ft.Text(
                     "События, компенсации и разовые награды не учтены. "
-                    "Shiyu Defense и Deadly Assault считаются по полной 14-дневной ротации.",
+                    "Shiyu Defense и Deadly Assault дают диапазон: без эндгейма — полный клир.",
                     size=9,
                     color=COLORS["text_muted"],
                 ),

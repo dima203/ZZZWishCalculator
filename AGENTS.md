@@ -30,17 +30,19 @@ ZZZWishCalculator/
 │   ├── storage.py               # JSON-настройки в ~/.zzz_wish_calculator/settings.json
 │   └── __init__.py              # реэкспорт публичного API core (+ __all__)
 ├── tests/
-│   ├── test_calculators.py      # 46 тестов: гача, экономика, edge cases
-│   ├── test_storage.py          # 13 тестов: JSON-хранилище, миграция дефолтов, ошибки
-│   ├── test_app.py              # 10 тестов Flet-слоя на MagicMock page (без окна)
+│   ├── test_calculators.py      # 54 теста: гача (агент/W-Engine), экономика, диапазон
+│   ├── test_storage.py          # 14 тестов: JSON-хранилище, миграция дефолтов, ошибки
+│   ├── test_app.py              # 14 тестов Flet-слоя на MagicMock page (без окна)
 │   ├── test_screenshot_tool.py  # 5 тестов чистых helper'ов скриншот-инструмента
+│   ├── test_events_probe.py     # 7 тестов парсинга официальных новостей
 │   └── test_environment.py      # 2 теста версий flet/ruff (гейт миграции)
 ├── tools/
-│   └── screenshots.py           # boot приложения, обход вкладок, PNG в tools/screenshots/
+│   ├── screenshots.py           # boot приложения, обход вкладок, PNG в tools/screenshots/
+│   └── events_probe.py          # пробный отчёт по официальным новостям HoYoLAB
 ├── docs/
-│   └── events-research.md       # отчёт по источникам ивентов/дохода (не интегрирован)
+│   └── events-research.md       # отчёт по источникам ивентов/дохода
 ├── .github/workflows/ci.yml     # ruff + pytest на push в master и на PR
-├── requirements.txt             # flet==1.0.5, flet-desktop==1.0.5
+├── requirements.txt             # flet==1.0.5, flet-desktop==1.0.5, httpx
 ├── requirements-dev.txt         # pytest==9.1.1, ruff==0.17.3
 ├── ruff.toml                    # единая конфигурация линтера/форматтера
 ├── opencode.json                # локальный MCP context7 (в .gitignore)
@@ -77,7 +79,7 @@ python -m venv .venv
 # Приложение
 .\.venv\Scripts\python.exe main.py
 
-# Тесты (76)
+# Тесты (96)
 .\.venv\Scripts\python.exe -m pytest -q -p no:warnings
 .\.venv\Scripts\python.exe -m pytest tests/test_app.py -q
 .\.venv\Scripts\python.exe -m pytest tests/test_calculators.py::TestZZZGachaCalculator -q
@@ -91,9 +93,14 @@ python -m venv .venv
 # UI-приёмка: PNG по вкладкам в tools/screenshots/
 .\.venv\Scripts\python.exe tools\screenshots.py
 .\.venv\Scripts\python.exe tools\screenshots.py wish pulls
+
+# Пробный отчёт по официальным новостям/ивентам (без записи в настройки)
+.\.venv\Scripts\python.exe tools\events_probe.py --details
+.\.venv\Scripts\python.exe tools\events_probe.py --type 2 --limit 5 --json
 ```
 
-- Версии зафиксированы: Python 3.12.6, `flet==1.0.5` (`flet-desktop==1.0.5`), `pytest==9.1.1`, `ruff==0.17.3`.
+- Версии зафиксированы: Python 3.12.6, `flet==1.0.5` (`flet-desktop==1.0.5`), `pytest==9.1.1`, `ruff==0.17.3`,
+  `httpx~=0.28.1` (для events probe).
 - Пользовательские настройки: `~/.zzz_wish_calculator/settings.json`. Удалить файл — сбросить к дефолтам.
 - `tools/screenshots/` и `.ruff_cache/` в `.gitignore`; PNG не коммитятся.
 - Первый запуск Flet 1.0.5 может скачать desktop-runtime («Preparing Flet ... for the first use»).
@@ -131,6 +138,10 @@ python -m venv .venv
   `self.<field>.content.value` (не `self.<field>.value`). `guarantee_switch` — тоже контейнер со `Switch`.
 - После изменения `value` / `visible` нужен `page.update()`. В hover-хендлерах обновлять точечно:
   `textfield.update()`, `container.update()` + `button.update()`.
+- Расчёты — `async`-хендлеры: `_on_wish_calculate` / `_on_pull_calculate` показывают `ProgressRing`
+  с текстом «СЧИТАЕМ...», блокируют кнопку, затем считают. Тесты вызывают их через `asyncio.run`.
+- Поле счётчика называется **«КРУТОК БЕЗ S-РАНГА»** (не «Текущий пити»). Это число уже сделанных
+  круток после последнего S-ранга, допустимо `0..hard_pity-1`.
 - `ft.NumbersOnlyInputFilter()` не пропускает минус — отрицательные значения из UI не приходят.
 - `_on_textfield_hover` пересобирает `border` и меняет `bgcolor`; `_on_button_hover` — `shadow`, `scale`
   и `style.bgcolor`.
@@ -140,15 +151,14 @@ python -m venv .venv
 - Базовый шанс 0.6% на крутках 1..73; soft pity с 74-й — оценка сообщества: +6 п.п. за крутку
   (6.6%, 12.6%, …, 96.6% на 89-й); 90-я крутка — 100%. Официально HoYoverse публикует только
   базовую ставку и hard pity, точная кривая не раскрыта.
-- W-Engine (справочно, в калькуляторе пока не считается): 80 hard pity, 75% на ивентовый, гарант после промаха.
+- W-Engine: 80 hard pity, 75% на ивентовый, гарант после промаха; soft pity — оценка с 65-й, +6 п.п.
+  Канал выбирается в UI (`SegmentedButton`) и сохраняется в `wish.banner`.
 - Легендарный без гаранта: 50% ивентовый (pity → 0, гарант off) / 50% не-ивентовый (pity → 0, гарант on).
 - С гарантом: legendary всегда ивентовый, гарант снимается.
 - `_compute_distribution(pulls)` — DP по состояниям `(pity, guarantee)` с массивами длиной `pulls + 1`;
   стоимость растёт как O(pulls² × состояний). Для UI (≤ 90 круток) нормально, большие `pulls` не подавать.
-- `probability_k(pulls, k)` возвращает **P(≥ k)** (`sum(dist[k:])`); docstring и UI-подпись «ШАНС ≥K КОПИЙ»
-  это отражают.
-- `current_pity` валиден 0..89 (90 запрещён: на 90-й срабатывает гарант). `pulls < 0` → `ValueError`.
-- `probability_at_least_one(0) == 0.0`; при pity=89 и одной крутке без гаранта результат 0.5 (50/50).
+- `probability_k(pulls, k)` возвращает **P(≥ k)** (`sum(dist[k:])`); docstring и UI-подпись «ШАНС ≥K …» это отражают.
+- `current_pity` валиден `0..hard_pity-1` (для агента 0..89, для W-Engine 0..79).
 
 ### Экономика круток
 
@@ -165,6 +175,8 @@ python -m venv .venv
 
 - `weeks = days // 7` — неполная неделя не даёт недельный доход.
 - `rotations = days // 14` — Shiyu Defense и Deadly Assault считаются только полными ротациями.
+- `total_pulls_min` — без эндгейма (daily/weekly/subscription/shop), `total_pulls_max` — с полным клиром
+  Shiyu Defense и Deadly Assault. UI показывает диапазон.
 - Магазин: обход `start_date..start_date + days` включительно. 30 дней с 15 января всё равно задевают 1 февраля.
 - Полихромы и монохромы складываются (1:1), остаток меньше 160 отбрасывается.
 - `total_monochromes_used = min(monochromes, earned + polychromes)` — историческая формула «для отображения»,
@@ -198,15 +210,23 @@ python -m venv .venv
 - Скрипт сам добавляет корень репозитория в `sys.path`, поэтому запускается из любого CWD.
 - Скриншоты — локальная UI-приёмка; в CI их не снимают (нужен desktop-дисплей).
 
+### Events probe
+
+- `tools/events_probe.py` — пробный CLI: официальная лента HoYoLAB (`gids=8`, типы 1/2), фильтр
+  официального аккаунта, `Event Duration` из `structured_content`.
+- Ничего не пишет в настройки и не добавляет доходы в калькулятор; это только отчёт/разведка.
+- Endpoint недокументированный: кэшировать и проверять вручную; в CI не запускать.
+
 ## Testing
 
-- Всего **76** тестов, ~1 с, без сети, внешних сервисов и открытия окна.
-- `tests/test_calculators.py` — 46 тестов: `TestZZZGachaCalculator` (18), `TestZZZPullCalculator` (23),
-  `TestEdgeCases` (5). Проверяют soft pity с 74-й, доход, Ridu/Hollow/Shiyu/Deadly, месячный магазин.
-- `tests/test_storage.py` — 13 тестов: patch `core.storage._get_config_dir` / `_get_config_file` на временную
-  директорию, битый JSON, `OSError`, merge с дефолтами, round-trip.
-- `tests/test_app.py` — 10 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`, `OutlineInputBorder`,
-  расчёты, ошибки валидации, сохранение настроек, свёрнутая справка по источникам.
+- Всего **96** тестов, ~2 с, без сети, внешних сервисов и открытия окна.
+- `tests/test_calculators.py` — 54 теста: `TestZZZGachaCalculator` (18), `TestWEngineBanner` (6),
+  `TestZZZPullCalculator` (25), `TestEdgeCases` (5).
+- `tests/test_storage.py` — 14 тестов: patch путей, битый JSON, `OSError`, merge с дефолтами, round-trip,
+  защита `DEFAULT_SETTINGS` от мутации.
+- `tests/test_app.py` — 14 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`,
+  `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек.
+- `tests/test_events_probe.py` — 7 тестов парсинга официальных новостей без сети.
 - `tests/test_screenshot_tool.py` — 5 тестов чистых helper'ов без запуска Flet.
 - `tests/test_environment.py` — 2 гейта: flet 1.x и установленный ruff.
 - Тесты импортируют `core.*` / `app.*`, поэтому запускать из корня (отдельного `conftest.py`/`pyproject.toml` нет).
@@ -294,3 +314,7 @@ PR не принимается при красном CI по коду. Если 
     Не возвращать старые значения при «упрощении» прогноза.
 14. **Магазин — не бесплатные крутки**: 5 Encrypted Master Tapes в месяц стоят Residual Signal. Если их нет,
     прогноз завышен; это известное допущение, а не баг.
+15. **Диапазон круток**: `total_pulls_min` не включает Shiyu/Deadly, `total_pulls_max` включает полный клир.
+    Не показывать только максимум — пользователь может не закрывать эндгейм.
+16. **Async-хендлеры нельзя вызывать как sync**: в тестах только `asyncio.run(...)` / `asyncio.create_task`.
+17. **Баннер сохраняется в `wish.banner`**: `"agent"` или `"w_engine"`; при неизвестном значении — fallback на агента.

@@ -48,7 +48,7 @@ class TestStorage:
     def test_load_settings_loads_from_file(self):
         """Проверяет загрузку настроек из файла."""
         test_settings = {
-            "wish": {"pity": 50, "guarantee": True, "pulls": 100, "copies": 2},
+            "wish": {"pity": 50, "guarantee": True, "pulls": 100, "copies": 2, "banner": "w_engine"},
             "pull": {
                 "current_pulls": 10,
                 "current_polychromes": 1600,
@@ -80,7 +80,19 @@ class TestStorage:
             settings = load_settings()
             assert settings["wish"]["pity"] == 75
             assert settings["wish"]["guarantee"] == DEFAULT_SETTINGS["wish"]["guarantee"]
+            assert settings["wish"]["banner"] == "agent"
             assert settings["pull"] == DEFAULT_SETTINGS["pull"]
+
+    def test_load_settings_does_not_mutate_defaults(self):
+        """Загрузка не должна менять общий DEFAULT_SETTINGS."""
+        custom = {"wish": {"banner": "w_engine"}}
+
+        with patch("core.storage._get_config_file", return_value=self.temp_config_file):
+            self.temp_config_dir.mkdir(parents=True, exist_ok=True)
+            self.temp_config_file.write_text(json.dumps(custom), encoding="utf-8")
+            assert load_settings()["wish"]["banner"] == "w_engine"
+
+        assert DEFAULT_SETTINGS["wish"]["banner"] == "agent"
 
     def test_load_settings_handles_corrupted_json(self):
         """Проверяет обработку поврежденного JSON файла."""
@@ -122,7 +134,7 @@ class TestStorage:
     def test_get_wish_settings(self):
         """Проверяет получение настроек wish калькулятора."""
         test_settings = {
-            "wish": {"pity": 25, "guarantee": True, "pulls": 30, "copies": 1},
+            "wish": {"pity": 25, "guarantee": True, "pulls": 30, "copies": 1, "banner": "agent"},
             "pull": DEFAULT_SETTINGS["pull"],
         }
 
@@ -140,11 +152,17 @@ class TestStorage:
             patch("core.storage._get_config_dir", return_value=self.temp_config_dir),
             patch("core.storage._get_config_file", return_value=self.temp_config_file),
         ):
-            result = save_wish_settings(pity=40, guarantee=True, pulls=80, copies=3)
+            result = save_wish_settings(pity=40, guarantee=True, pulls=80, copies=3, banner="w_engine")
             assert result is True
 
             settings = load_settings()
-            assert settings["wish"] == {"pity": 40, "guarantee": True, "pulls": 80, "copies": 3}
+            assert settings["wish"] == {
+                "pity": 40,
+                "guarantee": True,
+                "pulls": 80,
+                "copies": 3,
+                "banner": "w_engine",
+            }
             assert settings["pull"] == DEFAULT_SETTINGS["pull"]
 
     def test_get_pull_settings(self):
@@ -197,7 +215,7 @@ class TestStorage:
         """Проверяет структуру дефолтных настроек."""
         assert "wish" in DEFAULT_SETTINGS
         assert "pull" in DEFAULT_SETTINGS
-        assert set(DEFAULT_SETTINGS["wish"].keys()) == {"pity", "guarantee", "pulls", "copies"}
+        assert set(DEFAULT_SETTINGS["wish"].keys()) == {"pity", "guarantee", "pulls", "copies", "banner"}
         assert set(DEFAULT_SETTINGS["pull"].keys()) == {
             "current_pulls",
             "current_polychromes",
@@ -213,7 +231,7 @@ class TestStorage:
             patch("core.storage._get_config_file", return_value=self.temp_config_file),
         ):
             # Сохраняем настройки
-            save_wish_settings(pity=60, guarantee=False, pulls=120, copies=2)
+            save_wish_settings(pity=60, guarantee=False, pulls=120, copies=2, banner="agent")
             save_pull_settings(
                 current_pulls=15,
                 current_polychromes=2400,
@@ -224,7 +242,13 @@ class TestStorage:
 
             # Загружаем и проверяем
             loaded = load_settings()
-            assert loaded["wish"] == {"pity": 60, "guarantee": False, "pulls": 120, "copies": 2}
+            assert loaded["wish"] == {
+                "pity": 60,
+                "guarantee": False,
+                "pulls": 120,
+                "copies": 2,
+                "banner": "agent",
+            }
             assert loaded["pull"] == {
                 "current_pulls": 15,
                 "current_polychromes": 2400,
