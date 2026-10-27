@@ -12,61 +12,28 @@
 
 import argparse
 import json
-import re
 import sys
 from operator import itemgetter
+from pathlib import Path
 from typing import Any
 
 import httpx
 
-API_BASE = "https://bbs-api-os.hoyolab.com/community/post/wapi"
-GIDS = 8
-OFFICIAL_UID = "219270333"
-OFFICIAL_CERT = "ZZZ Official"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (ZZZWishCalculator events probe)",
-    "Referer": "https://www.hoyolab.com/",
-}
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core.events import (
+    API_BASE,
+    GIDS,
+    HEADERS,
+    event_url,
+    extract_event_duration,
+    is_official,
+    parse_post_items,
+)
+
 NEWS_TYPE_LABELS = {1: "новости/анонсы", 2: "события/награды"}
-
-
-def is_official(item: dict[str, Any]) -> bool:
-    """Проверяет, что публикация принадлежит официальному аккаунту ZZZ."""
-    user = item.get("user") or {}
-    certification = user.get("certification") or {}
-    return user.get("uid") == OFFICIAL_UID or certification.get("desc") == OFFICIAL_CERT
-
-
-def parse_post_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Достаёт список публикаций из ответа getNewsList."""
-    return list((payload.get("data") or {}).get("list") or [])
-
-
-def event_url(post_id: str) -> str:
-    """Ссылка на официальную публикацию."""
-    return f"https://www.hoyolab.com/article/{post_id}"
-
-
-def extract_event_duration(structured_content: str) -> str | None:
-    """Достаёт строку Event Duration из Quill-ops публикации."""
-    try:
-        operations = json.loads(structured_content)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(operations, list):
-        return None
-
-    text = "".join(
-        operation.get("insert", "")
-        for operation in operations
-        if isinstance(operation, dict) and isinstance(operation.get("insert"), str)
-    )
-    match = re.search(r"Event Duration\s*([^\n]+)", text)
-    if match:
-        value = match.group(1).strip().lstrip(":：").strip()
-        if len(value) >= 6 and re.search(r"\d", value):
-            return value
-    return None
 
 
 def build_event_rows(

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import flet as ft
 
 from app import ZZZGachaApp
+from core.events import EventIncome
 from core.pull_calculator import ZZZPullCalculator
 from core.wish_calculator import ZZZGachaCalculator
 
@@ -232,7 +233,10 @@ def test_pull_calculation_shows_total_and_breakdown() -> None:
         start_date=date.today(),
     ).calculate()
 
-    with patch("app.app.storage.save_pull_settings") as save:
+    with (
+        patch("app.app.events.get_event_income", return_value=EventIncome.empty()),
+        patch("app.app.storage.save_pull_settings") as save,
+    ):
         run(app._on_pull_calculate(None))
 
     assert save.call_args.args == (5, 320, 160, 30, 30)
@@ -240,6 +244,42 @@ def test_pull_calculation_shows_total_and_breakdown() -> None:
     assert f"Итого круток (мин.): {expected.total_pulls_min}" in app.pull_result_details.value
     assert f"Итого круток (макс.): {expected.total_pulls_max}" in app.pull_result_details.value
     assert app.pull_result_card.visible is True
+
+
+def test_pull_calculation_includes_event_income() -> None:
+    app = make_app()
+    set_text_field(app.pull_current_pulls, "0")
+    set_text_field(app.pull_current_polychromes, "0")
+    set_text_field(app.pull_current_monochromes, "0")
+    set_text_field(app.pull_subscription_days, "0")
+    set_text_field(app.pull_days, "30")
+
+    income = EventIncome(polychromes_min=900, polychromes_max=900, tapes=10)
+    expected = ZZZPullCalculator(days=30, start_date=date.today()).calculate()
+
+    with patch("app.app.events.get_event_income", return_value=income):
+        run(app._on_pull_calculate(None))
+
+    event_pulls = income.max_pulls
+    assert event_pulls == 15
+    assert app.pull_result_text.value == (
+        f"🎯 ИТОГО КРУТОК: {expected.total_pulls_min + event_pulls}–{expected.total_pulls_max + event_pulls}"
+    )
+    assert f"Ивенты (макс.): {event_pulls}" in app.pull_result_details.value
+    assert f"+{event_pulls}–{event_pulls}" in app.events_status.value
+
+
+def test_events_toggle_disables_automatic_income() -> None:
+    app = make_app()
+    set_text_field(app.pull_days, "30")
+    app.events_switch.value = False
+    app._on_events_toggle(None)
+
+    with patch("app.app.events.get_event_income") as fetch:
+        run(app._on_pull_calculate(None))
+
+    fetch.assert_not_called()
+    assert app.events_status.value == "Ивенты: отключены"
 
 
 def test_pull_calculation_rejects_zero_days() -> None:
@@ -250,7 +290,10 @@ def test_pull_calculation_rejects_zero_days() -> None:
     set_text_field(app.pull_subscription_days, "0")
     set_text_field(app.pull_days, "0")
 
-    with patch("app.app.storage.save_pull_settings") as save:
+    with (
+        patch("app.app.events.get_event_income", return_value=EventIncome.empty()),
+        patch("app.app.storage.save_pull_settings") as save,
+    ):
         run(app._on_pull_calculate(None))
 
     assert app.pull_result_text.value == "⚠️ ДНЕЙ ДОЛЖНО БЫТЬ БОЛЬШЕ 0"

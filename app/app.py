@@ -1,9 +1,11 @@
 import asyncio
+from datetime import date
 from typing import Any
 
 import flet as ft
 
-from core import BANNERS, ZZZGachaCalculator, ZZZPullCalculator, storage
+from core import BANNERS, ZZZGachaCalculator, ZZZPullCalculator, events, storage
+from core.events import EventIncome
 
 # ZZZ (Zenless Zone Zero) Cyberpunk/Neon Color Palette
 COLORS: dict[str, str] = {
@@ -832,13 +834,39 @@ class ZZZGachaApp:
         self.page.update()
         await asyncio.sleep(0.15)
         try:
-            self._calculate_pull()
+            event_income = await self._get_event_income()
+            self._calculate_pull(event_income)
         finally:
             self._set_busy(self.pull_button, self.pull_progress, False)
             self.page.update()
 
-    def _calculate_pull(self) -> None:
+    async def _get_event_income(self) -> EventIncome:
+        """Загружает оценку ивентов из кэша/сети, не ломая расчёт при сбое."""
+        if not self.include_events:
+            return EventIncome.empty()
+        try:
+            days = int(self.pull_days.content.value)
+        except ValueError:
+            return EventIncome.empty()
+        try:
+            income = await asyncio.to_thread(events.get_event_income, date.today(), days)
+        except events.EventsError:
+            self._events_error = True
+            return EventIncome.empty()
+        self._events_error = False
+        return income
+
+    def _on_events_toggle(self, e: ft.ControlEvent | None) -> None:
+        """Включает/выключает учёт ивентов."""
+        self.include_events = bool(self.events_switch.value)
+        self.events_status.value = "Ивенты: загрузятся при расчёте" if self.include_events else "Ивенты: отключены"
+        self.page.update()
+
+    def _calculate_pull(self, event_income: EventIncome | None = None) -> None:
         """Считает прогноз и обновляет карточку результата."""
+        event_income = event_income or EventIncome.empty()
+        event_min = event_income.min_pulls
+        event_max = event_income.max_pulls
         try:
             current_pulls = int(self.pull_current_pulls.content.value)
             current_polychromes = int(self.pull_current_polychromes.content.value)
@@ -867,15 +895,16 @@ class ZZZGachaApp:
             )
 
             result = calc.calculate()
+            total_min = result.total_pulls_min + event_min
+            total_max = result.total_pulls_max + event_max
 
-            if result.total_pulls_min == result.total_pulls_max:
-                total_text = str(result.total_pulls_max)
-                self.pull_result_hint.value = "эндгейм не входит в выбранный период"
+            if total_min == total_max:
+                total_text = str(total_max)
+                self.pull_result_hint.value = "фиксированный доход за выбранный период"
             else:
-                total_text = f"{result.total_pulls_min}–{result.total_pulls_max}"
-                self.pull_result_hint.value = (
-                    f"{result.total_pulls_min} — без эндгейма · {result.total_pulls_max} — полный клир"
-                )
+                total_text = f"{total_min}–{total_max}"
+                suffix = "эндгейм + ивенты" if self.include_events else "эндгейм"
+                self.pull_result_hint.value = f"{total_min} — минимум · {total_max} — максимум ({suffix})"
             self.pull_result_text.value = f"🎯 ИТОГО КРУТОК: {total_text}"
             self.pull_result_text.color = COLORS["success"]
             self.pull_result_card.border = ft.Border.all(1, COLORS["success"])
@@ -885,8 +914,24 @@ class ZZZGachaApp:
                 offset=ft.Offset(0, 6),
             )
 
+            if not self.include_events:
+                self.events_status.value = "Ивенты: отключены"
+            elif self._events_error:
+                self.events_status.value = "Ивенты: нет данных (офлайн или ошибка сети)"
+            elif event_income.polychromes_max or event_income.tapes:
+                count = f" · {len(event_income.events)} событий" if event_income.events else ""
+                self.events_status.value = f"Ивенты (по анонсам): +{event_min}–{event_max} круток{count}"
+            else:
+                self.events_status.value = "Ивенты: активных анонсов не найдено"
+
             breakdown = calc.get_detailed_breakdown()
-            lines = [f"{k}: {v}" for k, v in breakdown.items()]
+            lines = [
+                f"Ивенты (мин.): {event_min}",
+                f"Ивенты (макс.): {event_max}",
+                f"Ивенты, Polychrome: {event_income.polychromes_min}–{event_income.polychromes_max}",
+                f"Ивенты, талоны: {event_income.tapes}",
+                *(f"{k}: {v}" for k, v in breakdown.items()),
+            ]
             self.pull_result_details.value = "\n".join(lines)
 
             self.pull_result_card.visible = True
@@ -946,6 +991,39 @@ class ZZZGachaApp:
             col={"xs": 6},
         )
 
+        self.include_events = True
+        self._events_error = False
+        self.events_switch = ft.Switch(
+            value=True,
+            active_color=COLORS["primary"],
+            inactive_thumb_color=COLORS["text_muted"],
+            inactive_track_color=COLORS["bg"],
+            scale=0.9,
+            on_change=self._on_events_toggle,
+        )
+        events_row = ft.Container(
+            content=ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(ft.Icons.EVENT, size=18, color=COLORS["secondary"]),
+                    ft.Column(
+                        spacing=1,
+                        expand=True,
+                        controls=[
+                            ft.Text("УЧИТЫВАТЬ ИВЕНТЫ", size=10, weight=ft.FontWeight.BOLD, color=COLORS["text"]),
+                            ft.Text("авто-оценка из официальных постов", size=9, color=COLORS["text_muted"]),
+                        ],
+                    ),
+                    self.events_switch,
+                ],
+            ),
+            padding=ft.Padding(10, 6, 8, 6),
+            border_radius=12,
+            bgcolor=COLORS["bg_secondary"],
+            border=ft.Border.all(1, COLORS["border"]),
+        )
+
         self.pull_calc_button = self._create_neon_button(
             text="РАССЧИТАТЬ КРУТКИ",
             on_click=self._on_pull_calculate,
@@ -960,6 +1038,12 @@ class ZZZGachaApp:
                 ft.ProgressRing(width=14, height=14, stroke_width=2, color=COLORS["primary"]),
                 ft.Text("СЧИТАЕМ...", size=9, color=COLORS["text_secondary"]),
             ],
+        )
+        self.events_status = ft.Text(
+            "Ивенты: загрузятся при расчёте",
+            size=9,
+            color=COLORS["text_muted"],
+            text_align=ft.TextAlign.CENTER,
         )
 
         self.pull_result_text = ft.Text(
@@ -1002,7 +1086,7 @@ class ZZZGachaApp:
         self.rates_info = ft.ExpansionTile(
             title=ft.Text("КУРСЫ И ИСТОЧНИКИ", size=12, weight=ft.FontWeight.BOLD, color=COLORS["text"]),
             subtitle=ft.Text(
-                "проверенные значения · события не включены",
+                "проверенные значения · ивенты — авто-оценка",
                 size=9,
                 color=COLORS["text_muted"],
             ),
@@ -1030,9 +1114,10 @@ class ZZZGachaApp:
                     "daily · weekly · endgame · магазин",
                     ft.Icons.CALENDAR_MONTH,
                 ),
-                self._card(ft.Column(spacing=12, controls=[fields])),
+                self._card(ft.Column(spacing=12, controls=[fields, events_row])),
                 self.pull_calc_button,
                 self.pull_progress,
+                self.events_status,
                 self.pull_result_card,
                 self.rates_info,
             ],
@@ -1059,7 +1144,7 @@ class ZZZGachaApp:
                 self._rate_row("W-ENGINE", "80 ПИТИ · 75/25", COLORS["secondary"]),
                 self._rate_row("SOFT PITY", "~74 · +6 П.П.", COLORS["warning"]),
                 ft.Text(
-                    "События, компенсации и разовые награды не учтены. "
+                    "Ивенты считаются отдельной авто-оценкой: подтверждённые суммы + запас для неизвестных. "
                     "Shiyu Defense и Deadly Assault дают диапазон: без эндгейма — полный клир.",
                     size=9,
                     color=COLORS["text_muted"],

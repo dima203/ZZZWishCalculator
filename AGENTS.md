@@ -28,12 +28,14 @@ ZZZWishCalculator/
 │   ├── wish_calculator.py       # ZZZGachaCalculator — DP по состояниям (pity, guarantee)
 │   ├── pull_calculator.py       # ZZZPullCalculator + Currency / PullCalculationResult
 │   ├── storage.py               # JSON-настройки в ~/.zzz_wish_calculator/settings.json
+│   ├── events.py                # HoYoLAB-ивенты, парсинг наград, кэш и оценка
 │   └── __init__.py              # реэкспорт публичного API core (+ __all__)
 ├── tests/
 │   ├── test_calculators.py      # 54 теста: гача (агент/W-Engine), экономика, диапазон
 │   ├── test_storage.py          # 14 тестов: JSON-хранилище, миграция дефолтов, ошибки
-│   ├── test_app.py              # 14 тестов Flet-слоя на MagicMock page (без окна)
+│   ├── test_app.py              # 16 тестов Flet-слоя на MagicMock page (без окна)
 │   ├── test_screenshot_tool.py  # 5 тестов чистых helper'ов скриншот-инструмента
+│   ├── test_events.py           # 10 тестов парсинга наград/дат и оценки ивентов
 │   ├── test_events_probe.py     # 7 тестов парсинга официальных новостей
 │   └── test_environment.py      # 2 теста версий flet/ruff (гейт миграции)
 ├── tools/
@@ -60,6 +62,7 @@ ZZZWishCalculator/
 | Механика гачи | `core/wish_calculator.py` (docstring класса) | base/soft/hard pity, 50/50, гарант |
 | Экономика круток | `core/pull_calculator.py` (docstring + константы) | источники дохода, конвертация |
 | Схема настроек | `core/storage.py` (`DEFAULT_SETTINGS`) | ключи и дефолты JSON |
+| Авто-ивенты | `core/events.py` | HoYoLAB, парсинг наград, кэш, диапазон |
 | Палитра и стили | `app/app.py` (`COLORS`) | цвета, тема, размеры окна |
 | Источники ивентов | `docs/events-research.md` | HoYoLAB/HYP API, надёжность, ограничения |
 | CI-гейт | `.github/workflows/ci.yml` | ruff + pytest |
@@ -79,7 +82,7 @@ python -m venv .venv
 # Приложение
 .\.venv\Scripts\python.exe main.py
 
-# Тесты (96)
+# Тесты (108)
 .\.venv\Scripts\python.exe -m pytest -q -p no:warnings
 .\.venv\Scripts\python.exe -m pytest tests/test_app.py -q
 .\.venv\Scripts\python.exe -m pytest tests/test_calculators.py::TestZZZGachaCalculator -q
@@ -175,8 +178,8 @@ python -m venv .venv
 
 - `weeks = days // 7` — неполная неделя не даёт недельный доход.
 - `rotations = days // 14` — Shiyu Defense и Deadly Assault считаются только полными ротациями.
-- `total_pulls_min` — без эндгейма (daily/weekly/subscription/shop), `total_pulls_max` — с полным клиром
-  Shiyu Defense и Deadly Assault. UI показывает диапазон.
+- `total_pulls_min` — без эндгейма и без ивентов, `total_pulls_max` — с полным клиром
+  Shiyu Defense + Deadly Assault и с ивентами. UI показывает диапазон.
 - Магазин: обход `start_date..start_date + days` включительно. 30 дней с 15 января всё равно задевают 1 февраля.
 - Полихромы и монохромы складываются (1:1), остаток меньше 160 отбрасывается.
 - `total_monochromes_used = min(monochromes, earned + polychromes)` — историческая формула «для отображения»,
@@ -210,22 +213,29 @@ python -m venv .venv
 - Скрипт сам добавляет корень репозитория в `sys.path`, поэтому запускается из любого CWD.
 - Скриншоты — локальная UI-приёмка; в CI их не снимают (нужен desktop-дисплей).
 
-### Events probe
+### Events probe и авто-доход
 
 - `tools/events_probe.py` — пробный CLI: официальная лента HoYoLAB (`gids=8`, типы 1/2), фильтр
   официального аккаунта, `Event Duration` из `structured_content`.
-- Ничего не пишет в настройки и не добавляет доходы в калькулятор; это только отчёт/разведка.
-- Endpoint недокументированный: кэшировать и проверять вручную; в CI не запускать.
+- `core/events.py` — та же лента для приложения: парсит явные `Polychrome ×N`/`Encrypted Master Tape ×N`,
+  применяет каталог подтверждённых наград 3.3, fallback 300 для неизвестных `Event Details`.
+- Кэш: `~/.zzz_wish_calculator/events_cache.json`, TTL 6 часов. При сбое сети используется устаревший кэш;
+  без кэша расчёт продолжается без ивентов и показывает статус ошибки.
+- В UI есть переключатель «УЧИТЫВАТЬ ИВЕНТЫ». Сумма идёт в общий диапазон: подтверждённые награды — в min,
+  неизвестные — только в max. События не пишутся в `settings.json`.
+- В патчноуте (`update announcement`) считаются только строки `Compensation`, иначе талоны других
+  ивентов задваиваются.
 
 ## Testing
 
-- Всего **96** тестов, ~2 с, без сети, внешних сервисов и открытия окна.
+- Всего **108** тестов, ~3 с, без сети, внешних сервисов и открытия окна.
 - `tests/test_calculators.py` — 54 теста: `TestZZZGachaCalculator` (18), `TestWEngineBanner` (6),
   `TestZZZPullCalculator` (25), `TestEdgeCases` (5).
 - `tests/test_storage.py` — 14 тестов: patch путей, битый JSON, `OSError`, merge с дефолтами, round-trip,
   защита `DEFAULT_SETTINGS` от мутации.
-- `tests/test_app.py` — 14 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`,
-  `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек.
+- `tests/test_app.py` — 16 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`,
+  `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек, ивенты.
+- `tests/test_events.py` — 10 тестов парсинга наград/дат, каталога, fallback и диапазона.
 - `tests/test_events_probe.py` — 7 тестов парсинга официальных новостей без сети.
 - `tests/test_screenshot_tool.py` — 5 тестов чистых helper'ов без запуска Flet.
 - `tests/test_environment.py` — 2 гейта: flet 1.x и установленный ruff.
@@ -314,7 +324,11 @@ PR не принимается при красном CI по коду. Если 
     Не возвращать старые значения при «упрощении» прогноза.
 14. **Магазин — не бесплатные крутки**: 5 Encrypted Master Tapes в месяц стоят Residual Signal. Если их нет,
     прогноз завышен; это известное допущение, а не баг.
-15. **Диапазон круток**: `total_pulls_min` не включает Shiyu/Deadly, `total_pulls_max` включает полный клир.
-    Не показывать только максимум — пользователь может не закрывать эндгейм.
+15. **Диапазон круток**: `total_pulls_min` не включает Shiyu/Deadly и ивенты, `total_pulls_max` включает
+    полный клир и ивенты. Не показывать только максимум — пользователь может не закрывать эндгейм.
 16. **Async-хендлеры нельзя вызывать как sync**: в тестах только `asyncio.run(...)` / `asyncio.create_task`.
 17. **Баннер сохраняется в `wish.banner`**: `"agent"` или `"w_engine"`; при неизвестном значении — fallback на агента.
+18. **Ивенты не должны ломать расчёт**: сеть/кэш только в `core/events.py`; при ошибке — пустой `EventIncome`
+    и статус, а не исключение в UI. Каталог 3.3 обновлять при новых подтверждённых наградах.
+19. **Не парсить патчноут как ивент целиком**: в нём перечислены награды других событий; брать только
+    `Compensation`, иначе `Encrypted Master Tape ×10` задваивается.
