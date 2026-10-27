@@ -35,6 +35,10 @@ def set_text_field(field: ft.Container, value: str) -> None:
     field.content.value = value
 
 
+def set_slider(slider: ft.Slider, value: int) -> None:
+    slider.value = value
+
+
 def run(coro):
     return asyncio.run(coro)
 
@@ -55,10 +59,10 @@ def _collect_text(control: ft.Control) -> list[str]:
     return values
 
 
-def test_tabs_are_built_with_two_tabs() -> None:
+def test_tabs_are_built_with_three_tabs() -> None:
     app = make_app()
 
-    assert app.tabs.length == 2
+    assert app.tabs.length == 3
     assert app.tabs.selected_index == 0
 
 
@@ -113,7 +117,7 @@ def test_wish_calculation_reports_at_least_k_copies() -> None:
     app = make_app()
     set_text_field(app.pity_field, "30")
     set_text_field(app.pulls_field, "50")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     expected = ZZZGachaCalculator(current_pity=30, guarantee=False).probability_k(50, 1)
     with patch("app.app.storage.save_wish_settings") as save:
@@ -125,24 +129,40 @@ def test_wish_calculation_reports_at_least_k_copies() -> None:
     assert app.page.update.called
 
 
-def test_wish_calculation_with_zero_copies_means_at_least_one() -> None:
+def test_copies_slider_caps_agent_and_engine() -> None:
+    app = make_app()
+
+    assert app.copies_slider.max == 7
+    assert app.copies_slider.value == 1
+
+    app.copies_slider.value = 7
+    app.banner_select.selected = ["w_engine"]
+    app._on_banner_change(None)
+
+    assert app.copies_slider.max == 5
+    assert app.copies_slider.value == 5
+    assert "R5" in app.copies_caption.value
+
+
+def test_wish_calculation_uses_two_copies_from_slider() -> None:
     app = make_app()
     set_text_field(app.pity_field, "0")
     set_text_field(app.pulls_field, "10")
-    set_text_field(app.copies_field, "0")
+    set_slider(app.copies_slider, 2)
 
-    expected = ZZZGachaCalculator(current_pity=0).probability_at_least_one(10)
-    with patch("app.app.storage.save_wish_settings"):
+    expected = ZZZGachaCalculator(current_pity=0).probability_k(10, 2)
+    with patch("app.app.storage.save_wish_settings") as save:
         run(app._on_wish_calculate(None))
 
-    assert app.wish_result_text.value == f"ШАНС ≥1 КОПИИ: {expected * 100:.2f}%"
+    assert save.call_args.args == (0, False, 10, 2, "agent")
+    assert app.wish_result_text.value == f"ШАНС ≥2 КОПИЙ: {expected * 100:.2f}%"
 
 
 def test_wish_calculation_rejects_pity_out_of_range() -> None:
     app = make_app()
     set_text_field(app.pity_field, "90")
     set_text_field(app.pulls_field, "50")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     with patch("app.app.storage.save_wish_settings") as save:
         run(app._on_wish_calculate(None))
@@ -157,7 +177,7 @@ def test_wish_calculation_rejects_non_numeric_input() -> None:
     app = make_app()
     set_text_field(app.pity_field, "")
     set_text_field(app.pulls_field, "50")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     with patch("app.app.storage.save_wish_settings"):
         run(app._on_wish_calculate(None))
@@ -172,7 +192,7 @@ def test_w_engine_calculation_uses_75_25() -> None:
     app._on_banner_change(None)
     set_text_field(app.pity_field, "0")
     set_text_field(app.pulls_field, "1")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     expected = ZZZGachaCalculator(current_pity=0, banner="w_engine").probability_k(1, 1)
     with patch("app.app.storage.save_wish_settings") as save:
@@ -188,7 +208,7 @@ def test_w_engine_pity_validation() -> None:
     app._on_banner_change(None)
     set_text_field(app.pity_field, "80")
     set_text_field(app.pulls_field, "10")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     with patch("app.app.storage.save_wish_settings") as save:
         run(app._on_wish_calculate(None))
@@ -201,7 +221,7 @@ def test_progress_is_visible_while_wish_calculates() -> None:
     app = make_app()
     set_text_field(app.pity_field, "30")
     set_text_field(app.pulls_field, "50")
-    set_text_field(app.copies_field, "1")
+    set_slider(app.copies_slider, 1)
 
     async def scenario() -> None:
         task = asyncio.create_task(app._on_wish_calculate(None))
@@ -244,6 +264,30 @@ def test_pull_calculation_shows_total_and_breakdown() -> None:
     assert f"Итого круток (мин.): {expected.total_pulls_min}" in app.pull_result_details.value
     assert f"Итого круток (макс.): {expected.total_pulls_max}" in app.pull_result_details.value
     assert app.pull_result_card.visible is True
+
+
+def test_mix_calculation_combines_agent_and_engine_targets() -> None:
+    app = make_app()
+    set_text_field(app.mix_total_field, "180")
+    set_slider(app.mix_agent_slider, 2)
+    set_slider(app.mix_engine_slider, 1)
+
+    run(app._on_mix_calculate(None))
+
+    assert app.mix_result_text.value.startswith("ШАНС НА ОБА:")
+    assert "Агент:" in app.mix_result_details.value
+    assert "W-Engine:" in app.mix_result_details.value
+    assert "Сплит:" in app.mix_result_details.value
+    assert app.mix_result_card.visible is True
+
+
+def test_mix_calculation_rejects_zero_budget() -> None:
+    app = make_app()
+    set_text_field(app.mix_total_field, "0")
+
+    run(app._on_mix_calculate(None))
+
+    assert app.mix_result_text.value == "⚠️ КРУТОК ДОЛЖНО БЫТЬ БОЛЬШЕ 0"
 
 
 def test_pull_calculation_includes_event_income() -> None:

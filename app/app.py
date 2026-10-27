@@ -6,6 +6,7 @@ import flet as ft
 
 from core import BANNERS, ZZZGachaCalculator, ZZZPullCalculator, events, storage
 from core.events import EventIncome
+from core.mixed_calculator import calculate_mixed
 
 # ZZZ (Zenless Zone Zero) Cyberpunk/Neon Color Palette
 COLORS: dict[str, str] = {
@@ -91,6 +92,7 @@ class ZZZGachaApp:
         """Сборка интерфейса."""
         self._build_wish_tab()
         self._build_pull_tab()
+        self._build_mix_tab()
 
         self.tabs = ft.Tabs(
             content=ft.Column(
@@ -108,6 +110,7 @@ class ZZZGachaApp:
                         tabs=[
                             ft.Tab(label="ШАНС", icon=ft.Icons.CASINO),
                             ft.Tab(label="КРУТКИ", icon=ft.Icons.CALCULATE),
+                            ft.Tab(label="МИКС", icon=ft.Icons.AUTO_AWESOME),
                         ],
                     ),
                     ft.TabBarView(
@@ -115,11 +118,12 @@ class ZZZGachaApp:
                         controls=[
                             self._tab_page(self.wish_tab_content),
                             self._tab_page(self.pull_tab_content),
+                            self._tab_page(self.mix_tab_content),
                         ],
                     ),
                 ],
             ),
-            length=2,
+            length=3,
             selected_index=0,
             animation_duration=250,
             expand=True,
@@ -286,12 +290,17 @@ class ZZZGachaApp:
             col={"xs": 6},
         )
 
-        self.copies_field = self._create_neon_textfield(
-            label="КОПИЙ (K)",
-            value=str(self.wish_settings.get("copies", 1)),
-            hint="0 = хотя бы 1",
-            col={"xs": 6},
+        max_copies = 7 if self.banner == "agent" else 5
+        copies_value = max(1, min(int(self.wish_settings.get("copies", 1)), max_copies))
+        self.copies_field, self.copies_slider, self.copies_caption = self._create_target_slider(
+            label="КОПИЙ",
+            minimum=1,
+            maximum=max_copies,
+            value=copies_value,
+            on_change=self._on_copies_change,
+            col={"xs": 12},
         )
+        self._update_copies_caption()
 
         self.banner_select = ft.SegmentedButton(
             segments=[
@@ -310,7 +319,11 @@ class ZZZGachaApp:
             expand=True,
         )
 
-        self.guarantee_hint = ft.Text("следующий S — ивент", size=9, color=COLORS["text_muted"])
+        self.guarantee_hint = ft.Text(
+            "следующий S — ивент" if self.banner == "agent" else "следующий S — оружие",
+            size=9,
+            color=COLORS["text_muted"],
+        )
         self.guarantee_switch = ft.Container(
             content=ft.Switch(
                 value=self.wish_settings.get("guarantee", False),
@@ -442,11 +455,20 @@ class ZZZGachaApp:
 
     def _build_wish_stats(self) -> ft.Control:
         """Короткие ориентиры по pity под формой."""
+        spec = BANNERS[self.banner]
         self.wish_stat_hard = ft.Text(
-            "90", size=16, weight=ft.FontWeight.BOLD, color=COLORS["primary"], font_family="Consolas"
+            str(spec.hard_pity),
+            size=16,
+            weight=ft.FontWeight.BOLD,
+            color=COLORS["primary"],
+            font_family="Consolas",
         )
         self.wish_stat_guarantee = ft.Text(
-            "180", size=16, weight=ft.FontWeight.BOLD, color=COLORS["secondary"], font_family="Consolas"
+            str(spec.hard_pity * 2),
+            size=16,
+            weight=ft.FontWeight.BOLD,
+            color=COLORS["secondary"],
+            font_family="Consolas",
         )
         return ft.Container(
             content=ft.Row(
@@ -492,6 +514,28 @@ class ZZZGachaApp:
         rate = "50/50" if self.banner == "agent" else "75/25"
         return f"канал {spec.label.upper()} · {rate} · hard pity {spec.hard_pity}"
 
+    def _on_copies_change(self, e: ft.ControlEvent | None) -> None:
+        """Обновляет подпись слайдера копий."""
+        self._update_copies_caption()
+        self.wish_result_card.visible = False
+        self.page.update()
+
+    def _update_copies_caption(self) -> None:
+        value = int(self.copies_slider.value or 1)
+        if self.banner == "agent":
+            self.copies_caption.value = f"M{value - 1} · {value} {self._copies_word(value)}"
+        else:
+            self.copies_caption.value = f"R{value} · {value} {self._copies_word(value)}"
+
+    @staticmethod
+    def _copies_word(value: int) -> str:
+        """Русская форма слова «копия» для подписи."""
+        if value % 10 == 1 and value % 100 != 11:
+            return "копия"
+        if 2 <= value % 10 <= 4 and not 12 <= value % 100 <= 14:
+            return "копии"
+        return "копий"
+
     def _on_banner_change(self, e: ft.ControlEvent | None) -> None:
         """Переключает канал агента/W-Engine и обновляет подсказки."""
         selected = self.banner_select.selected
@@ -501,6 +545,12 @@ class ZZZGachaApp:
             self.banner = "agent"
         spec = BANNERS[self.banner]
 
+        maximum = 7 if self.banner == "agent" else 5
+        self.copies_slider.max = maximum
+        self.copies_slider.divisions = maximum - 1
+        self.copies_slider.value = max(1, min(int(self.copies_slider.value or 1), maximum))
+        self._update_copies_caption()
+
         self.wish_section_subtitle.value = self._banner_subtitle()
         self.guarantee_hint.value = "следующий S — ивент" if self.banner == "agent" else "следующий S — оружие"
         self.pity_field.content.label = "КРУТОК БЕЗ S-РАНГА"
@@ -509,6 +559,46 @@ class ZZZGachaApp:
         self.wish_stat_guarantee.value = str(spec.hard_pity * 2)
         self.wish_result_card.visible = False
         self.page.update()
+
+    def _create_target_slider(
+        self,
+        label: str,
+        minimum: int,
+        maximum: int,
+        value: int,
+        on_change: ft.ControlEvent | None = None,
+        col: dict[str, int] | None = None,
+    ) -> tuple[ft.Container, ft.Slider, ft.Text]:
+        """Слайдер цели с подписью текущего M/R и количества копий."""
+        caption = ft.Text("", size=9, color=COLORS["text_muted"])
+        slider = ft.Slider(
+            min=minimum,
+            max=maximum,
+            divisions=maximum - minimum,
+            value=value,
+            label="{value}",
+            active_color=COLORS["primary"],
+            inactive_color=COLORS["border"],
+            thumb_color=COLORS["primary_glow"],
+            on_change=on_change,
+        )
+        container = ft.Container(
+            content=ft.Column(
+                spacing=2,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(label, size=9, weight=ft.FontWeight.W_600, color=COLORS["text_secondary"]),
+                            caption,
+                        ],
+                    ),
+                    slider,
+                ],
+            ),
+            col=col,
+        )
+        return container, slider, caption
 
     def _create_neon_textfield(
         self,
@@ -758,7 +848,7 @@ class ZZZGachaApp:
         try:
             pity = int(self.pity_field.content.value)
             pulls = int(self.pulls_field.content.value)
-            k = int(self.copies_field.content.value)
+            k = int(self.copies_slider.value)
             guarantee = self.guarantee_switch.content.value
             spec = BANNERS[self.banner]
 
@@ -771,13 +861,8 @@ class ZZZGachaApp:
             calc = ZZZGachaCalculator(current_pity=pity, guarantee=guarantee, banner=self.banner)
 
             unit = "КОПИЙ" if self.banner == "agent" else "W-ENGINE"
-            if k == 0:
-                prob = calc.probability_at_least_one(pulls)
-                one_unit = "КОПИИ" if self.banner == "agent" else "W-ENGINE"
-                self.wish_result_text.value = f"ШАНС ≥1 {one_unit}: {prob * 100:.2f}%"
-            else:
-                prob = calc.probability_k(pulls, k)
-                self.wish_result_text.value = f"ШАНС ≥{k} {unit}: {prob * 100:.2f}%"
+            prob = calc.probability_k(pulls, k)
+            self.wish_result_text.value = f"ШАНС ≥{k} {unit}: {prob * 100:.2f}%"
 
             self.wish_result_text.color = COLORS["success"]
             self.wish_result_bar.value = prob
@@ -1122,6 +1207,276 @@ class ZZZGachaApp:
                 self.rates_info,
             ],
         )
+
+    def _build_mix_tab(self) -> None:
+        """Сборка вкладки смешанной цели: агент + W-Engine."""
+        self.mix_total_field = self._create_neon_textfield(
+            label="ВСЕГО КРУТОК",
+            value="180",
+            hint="общий бюджет",
+            col={"xs": 12},
+        )
+        self.mix_agent_pity = self._create_neon_textfield(
+            label="ПИТИ АГЕНТА",
+            value="0",
+            hint="0–89",
+            col={"xs": 6},
+        )
+        self.mix_engine_pity = self._create_neon_textfield(
+            label="ПИТИ W-ENGINE",
+            value="0",
+            hint="0–79",
+            col={"xs": 6},
+        )
+
+        self.mix_agent_guarantee = ft.Container(
+            content=ft.Switch(
+                value=False,
+                active_color=COLORS["primary"],
+                inactive_thumb_color=COLORS["text_muted"],
+                inactive_track_color=COLORS["bg"],
+                scale=0.9,
+            ),
+            padding=0,
+        )
+        self.mix_engine_guarantee = ft.Container(
+            content=ft.Switch(
+                value=False,
+                active_color=COLORS["primary"],
+                inactive_thumb_color=COLORS["text_muted"],
+                inactive_track_color=COLORS["bg"],
+                scale=0.9,
+            ),
+            padding=0,
+        )
+        agent_guarantee_card = self._guarantee_card("ГАРАНТ АГЕНТА", "следующий S — ивент", self.mix_agent_guarantee)
+        engine_guarantee_card = self._guarantee_card(
+            "ГАРАНТ W-ENGINE", "следующий S — оружие", self.mix_engine_guarantee
+        )
+
+        self.mix_agent_field, self.mix_agent_slider, self.mix_agent_caption = self._create_target_slider(
+            label="КОПИЙ АГЕНТА",
+            minimum=1,
+            maximum=7,
+            value=2,
+            on_change=self._on_mix_agent_slider,
+            col={"xs": 6},
+        )
+        self.mix_engine_field, self.mix_engine_slider, self.mix_engine_caption = self._create_target_slider(
+            label="КОПИЙ W-ENGINE",
+            minimum=1,
+            maximum=5,
+            value=1,
+            on_change=self._on_mix_engine_slider,
+            col={"xs": 6},
+        )
+        self._update_mix_captions()
+
+        self.mix_calc_button = self._create_neon_button(
+            text="РАССЧИТАТЬ МИКС",
+            on_click=self._on_mix_calculate,
+            icon=ft.Icons.AUTO_AWESOME,
+        )
+        self.mix_button = self.mix_calc_button.content.controls[0]
+        self.mix_progress = ft.Row(
+            spacing=6,
+            alignment=ft.MainAxisAlignment.CENTER,
+            visible=False,
+            controls=[
+                ft.ProgressRing(width=14, height=14, stroke_width=2, color=COLORS["primary"]),
+                ft.Text("СЧИТАЕМ...", size=9, color=COLORS["text_secondary"]),
+            ],
+        )
+
+        self.mix_result_text = ft.Text(
+            "",
+            size=30,
+            weight=ft.FontWeight.BOLD,
+            color=COLORS["success"],
+            text_align=ft.TextAlign.CENTER,
+            font_family="Consolas",
+        )
+        self.mix_result_bar = ft.ProgressBar(
+            value=0,
+            height=6,
+            color=COLORS["success"],
+            bgcolor=COLORS["border"],
+            border_radius=3,
+        )
+        self.mix_result_details = ft.Text(
+            "",
+            size=11,
+            color=COLORS["text_secondary"],
+            selectable=True,
+            text_align=ft.TextAlign.LEFT,
+            font_family="Consolas",
+        )
+        self.mix_result_hint = ft.Text(
+            "лучший фиксированный сплит · баннеры независимы",
+            size=9,
+            color=COLORS["text_muted"],
+            text_align=ft.TextAlign.CENTER,
+        )
+        self.mix_result_card = self._build_result_card(
+            title="СМЕШАННАЯ ЦЕЛЬ",
+            icon=ft.Icons.AUTO_AWESOME,
+            value_text=self.mix_result_text,
+            details_text=self.mix_result_details,
+            bar=self.mix_result_bar,
+            hint=self.mix_result_hint,
+        )
+
+        fields = ft.ResponsiveRow(
+            spacing=10,
+            run_spacing=10,
+            controls=[
+                self.mix_total_field,
+                self.mix_agent_pity,
+                self.mix_engine_pity,
+                agent_guarantee_card,
+                engine_guarantee_card,
+                self.mix_agent_field,
+                self.mix_engine_field,
+            ],
+        )
+
+        self.mix_tab_content = ft.Column(
+            spacing=12,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            controls=[
+                self._section_header(
+                    "АГЕНТ + W-ENGINE",
+                    "общий бюджет · независимые баннеры · лучший сплит",
+                    ft.Icons.AUTO_AWESOME,
+                ),
+                self._card(ft.Column(spacing=12, controls=[fields])),
+                self.mix_calc_button,
+                self.mix_progress,
+                self.mix_result_card,
+                ft.Text(
+                    "Слайдер копий: агент до M6 (7 копий), W-Engine до R5 (5 копий).",
+                    size=9,
+                    color=COLORS["text_muted"],
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ],
+        )
+
+    def _guarantee_card(self, title: str, hint: str, switch: ft.Control) -> ft.Container:
+        """Карточка гаранта для смешанной вкладки."""
+        return ft.Container(
+            content=ft.Row(
+                spacing=10,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Icon(ft.Icons.VERIFIED_USER, size=18, color=COLORS["secondary"]),
+                    ft.Column(
+                        spacing=1,
+                        expand=True,
+                        controls=[
+                            ft.Text(title, size=10, weight=ft.FontWeight.BOLD, color=COLORS["text"]),
+                            ft.Text(hint, size=9, color=COLORS["text_muted"]),
+                        ],
+                    ),
+                    switch,
+                ],
+            ),
+            padding=ft.Padding(10, 6, 8, 6),
+            border_radius=12,
+            bgcolor=COLORS["bg_secondary"],
+            border=ft.Border.all(1, COLORS["border"]),
+            col={"xs": 6},
+        )
+
+    def _on_mix_agent_slider(self, e: ft.ControlEvent | None) -> None:
+        self._update_mix_captions()
+        self.mix_result_card.visible = False
+        self.page.update()
+
+    def _on_mix_engine_slider(self, e: ft.ControlEvent | None) -> None:
+        self._update_mix_captions()
+        self.mix_result_card.visible = False
+        self.page.update()
+
+    def _update_mix_captions(self) -> None:
+        agent_copies = int(self.mix_agent_slider.value or 1)
+        engine_copies = int(self.mix_engine_slider.value or 1)
+        self.mix_agent_caption.value = f"M{agent_copies - 1} · {agent_copies} {self._copies_word(agent_copies)}"
+        self.mix_engine_caption.value = f"R{engine_copies} · {engine_copies} {self._copies_word(engine_copies)}"
+
+    async def _on_mix_calculate(self, e: ft.ControlEvent | None) -> None:
+        """Считает вероятность обеих целей при общем бюджете."""
+        self._set_busy(self.mix_button, self.mix_progress, True)
+        self.page.update()
+        await asyncio.sleep(0.15)
+        try:
+            self._calculate_mix()
+        finally:
+            self._set_busy(self.mix_button, self.mix_progress, False)
+            self.page.update()
+
+    def _calculate_mix(self) -> None:
+        try:
+            total_pulls = int(self.mix_total_field.content.value)
+            agent_pity = int(self.mix_agent_pity.content.value)
+            engine_pity = int(self.mix_engine_pity.content.value)
+            agent_copies = int(self.mix_agent_slider.value)
+            engine_copies = int(self.mix_engine_slider.value)
+            if total_pulls <= 0:
+                self._show_mix_error("⚠️ КРУТОК ДОЛЖНО БЫТЬ БОЛЬШЕ 0")
+                return
+            if not (0 <= agent_pity <= 89):
+                self._show_mix_error("⚠️ ПИТИ АГЕНТА ОТ 0 ДО 89")
+                return
+            if not (0 <= engine_pity <= 79):
+                self._show_mix_error("⚠️ ПИТИ W-ENGINE ОТ 0 ДО 79")
+                return
+
+            result = calculate_mixed(
+                total_pulls=total_pulls,
+                agent_copies=agent_copies,
+                engine_copies=engine_copies,
+                agent_pity=agent_pity,
+                agent_guarantee=self.mix_agent_guarantee.content.value,
+                engine_pity=engine_pity,
+                engine_guarantee=self.mix_engine_guarantee.content.value,
+            )
+            self.mix_result_text.value = f"ШАНС НА ОБА: {result.both_probability * 100:.2f}%"
+            self.mix_result_text.color = COLORS["success"]
+            self.mix_result_bar.value = result.both_probability
+            self.mix_result_bar.color = COLORS["success"]
+            self.mix_result_details.value = (
+                f"Агент: {result.agent_probability * 100:.2f}% · {result.agent_pulls} круток · "
+                f"{result.agent_copies} коп.\n"
+                f"W-Engine: {result.engine_probability * 100:.2f}% · {result.engine_pulls} круток · "
+                f"{result.engine_copies} коп.\n"
+                f"Сплит: {result.agent_pulls} / {result.engine_pulls}"
+            )
+            self.mix_result_card.border = ft.Border.all(1, COLORS["success"])
+            self.mix_result_card.shadow = ft.BoxShadow(
+                blur_radius=22,
+                color="#22C55E33",
+                offset=ft.Offset(0, 6),
+            )
+            self.mix_result_card.visible = True
+            self.page.update()
+        except ValueError:
+            self._show_mix_error("⚠️ ПРОВЕРЬТЕ ЗНАЧЕНИЯ")
+
+    def _show_mix_error(self, message: str) -> None:
+        self.mix_result_text.value = message
+        self.mix_result_text.color = COLORS["error"]
+        self.mix_result_bar.value = 0
+        self.mix_result_bar.color = COLORS["error"]
+        self.mix_result_details.value = "Проверьте введённые значения."
+        self.mix_result_card.border = ft.Border.all(1, COLORS["error"])
+        self.mix_result_card.shadow = ft.BoxShadow(
+            blur_radius=22,
+            color="#EF444433",
+            offset=ft.Offset(0, 6),
+        )
+        self.mix_result_card.visible = True
+        self.page.update()
 
     def _build_rates_content(self) -> ft.Control:
         """Содержимое раскрывающейся справки по курсам и источникам."""
