@@ -81,12 +81,26 @@ class TestZZZGachaCalculator:
         assert len(dist) == 6
 
     def test_soft_pity_increase(self):
-        """Test that probability increases during soft pity (75-89)."""
+        """Test that probability increases during soft pity (74-89)."""
         calc = ZZZGachaCalculator(current_pity=74)
         prob_75 = calc.probability_at_least_one(1)  # First pull at 75
         calc2 = ZZZGachaCalculator(current_pity=88)
         prob_89 = calc2.probability_at_least_one(1)  # First pull at 89
         assert prob_75 < prob_89
+
+    def test_soft_pity_curve_starts_at_74(self):
+        """Community-estimated ramp: 6.6% at 74, +6 p.p. per pull, 100% at 90."""
+        calc = ZZZGachaCalculator(current_pity=0)
+        assert calc.prob_legendary[73] == pytest.approx(0.006)
+        assert calc.prob_legendary[74] == pytest.approx(0.066)
+        assert calc.prob_legendary[75] == pytest.approx(0.126)
+        assert calc.prob_legendary[89] == pytest.approx(0.966)
+        assert calc.prob_legendary[90] == 1.0
+
+    def test_soft_pity_first_pull_probability(self):
+        """At pity 73 the 74th pull has 6.6% S-rank chance (3.3% for the featured agent)."""
+        calc = ZZZGachaCalculator(current_pity=73)
+        assert calc.probability_at_least_one(1) == pytest.approx(0.033)
 
     def test_hard_pity_at_90(self):
         """Test hard pity at 90 pulls guarantees legendary (50/50 for event)."""
@@ -143,7 +157,7 @@ class TestZZZPullCalculator:
 
     def test_calculate_only_current_pulls(self):
         """Test calculation with only current pulls."""
-        calc = ZZZPullCalculator(current_pulls=10, days=0)
+        calc = ZZZPullCalculator(current_pulls=10, days=0, start_date=date(2026, 1, 5))
         result = calc.calculate()
         assert result.total_pulls == 10
         assert result.from_current_pulls == 10
@@ -152,21 +166,21 @@ class TestZZZPullCalculator:
 
     def test_calculate_from_polychromes(self):
         """Test conversion of polychromes to pulls."""
-        calc = ZZZPullCalculator(current_polychromes=320, days=0)  # 2 pulls
+        calc = ZZZPullCalculator(current_polychromes=320, days=0, start_date=date(2026, 1, 5))  # 2 pulls
         result = calc.calculate()
         assert result.from_current_polychromes == 2
         assert result.total_pulls == 2
 
     def test_calculate_from_monochromes(self):
         """Test conversion of monochromes to pulls (1:1 with polychromes)."""
-        calc = ZZZPullCalculator(current_monochromes=160, days=0)  # 1 pull
+        calc = ZZZPullCalculator(current_monochromes=160, days=0, start_date=date(2026, 1, 5))  # 1 pull
         result = calc.calculate()
         assert result.from_current_monochromes == 1
         assert result.total_pulls == 1
 
     def test_calculate_daily_tasks(self):
         """Test daily task polychrome income."""
-        calc = ZZZPullCalculator(days=7)  # 7 days * 60 = 420 polychromes = 2 pulls
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=7)  # 7 * 60 = 420 = 2 pulls
         result = calc.calculate()
         assert result.from_daily_tasks == 2
 
@@ -185,17 +199,36 @@ class TestZZZPullCalculator:
         # Only 30 days counted
         assert result.from_subscription_polychromes == 90 * 30
 
-    def test_weekly_missions(self):
-        """Test weekly mission income."""
-        calc = ZZZPullCalculator(days=14)  # 2 weeks
+    def test_ridu_weekly(self):
+        """Test Ridu Weekly income (60 polychromes per week)."""
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=21)
         result = calc.calculate()
-        assert result.from_weekly_missions == 5  # 2 * 420 / 160 = 5.25 -> 5
+        assert result.from_ridu_weekly == 1  # 3 * 60 / 160 = 1.125 -> 1
 
-    def test_zero_hollow(self):
-        """Test Zero Hollow income."""
-        calc = ZZZPullCalculator(days=14)  # 2 weeks
+    def test_hollow_zero(self):
+        """Test Hollow Zero income (160 polychromes per week)."""
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=14)
         result = calc.calculate()
-        assert result.from_zero_hollow == 2  # 2 * 160 / 160 = 2
+        assert result.from_hollow_zero == 2  # 2 * 160 / 160 = 2
+
+    def test_shiyu_defense(self):
+        """Test Shiyu Defense Critical Node (780 polychromes per 14-day rotation)."""
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=28)
+        result = calc.calculate()
+        assert result.from_shiyu_defense == 9  # 2 * 780 / 160 = 9.75 -> 9
+
+    def test_deadly_assault(self):
+        """Test Deadly Assault (300 polychromes per 14-day rotation)."""
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=28)
+        result = calc.calculate()
+        assert result.from_deadly_assault == 3  # 2 * 300 / 160 = 3.75 -> 3
+
+    def test_endgame_rotations_require_full_period(self):
+        """Endgame income starts only after a complete 14-day rotation."""
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=13)
+        result = calc.calculate()
+        assert result.from_shiyu_defense == 0
+        assert result.from_deadly_assault == 0
 
     def test_monthly_shop_pulls(self):
         """Test monthly shop pulls."""
@@ -217,22 +250,28 @@ class TestZZZPullCalculator:
     def test_total_pulls_calculation(self):
         """Test total pulls combines all sources correctly."""
         calc = ZZZPullCalculator(
-            current_pulls=5, current_polychromes=160, current_monochromes=160, subscription_days=30, days=30
+            current_pulls=5,
+            current_polychromes=160,
+            current_monochromes=160,
+            subscription_days=30,
+            days=30,
+            start_date=date(2026, 1, 5),
         )
         result = calc.calculate()
-        # Total = current_pulls + (all_polychromes // 160) + monthly_shop
-        # = 5 + (160+160+1800+2700+1680+640)//160 + 5
-        # = 5 + 7140//160 + 5
-        # = 5 + 44 + 5 = 54
-        expected = 54
-        assert result.total_pulls == expected
+        # 30 daily (1800) + 30 subscription (2700) + 4 Ridu (240) + 4 Hollow (640)
+        # + 2 Shiyu (1560) + 2 Deadly Assault (600) = 7540 earned.
+        # Current: 5 pulls + (160+160+7540)//160 + 5 shop = 5 + 49 + 5 = 59.
+        assert result.total_pulls == 59
 
     def test_get_detailed_breakdown(self):
         """Test detailed breakdown dictionary."""
-        calc = ZZZPullCalculator(current_pulls=5, days=0)
+        calc = ZZZPullCalculator(current_pulls=5, days=0, start_date=date(2026, 1, 5))
         breakdown = calc.get_detailed_breakdown()
         assert breakdown["Текущие крутки"] == 5
         assert breakdown["Итого круток"] == 5
+        assert "Ridu Weekly" in breakdown
+        assert "Shiyu Defense" in breakdown
+        assert "Deadly Assault" in breakdown
         assert "Дней в расчёте" in breakdown
 
     def test_days_calculated_in_result(self):
@@ -243,10 +282,10 @@ class TestZZZPullCalculator:
 
     def test_total_polychromes_earned(self):
         """Test total polychromes earned calculation."""
-        calc = ZZZPullCalculator(days=7)
+        calc = ZZZPullCalculator(start_date=date(2026, 1, 5), days=7)
         result = calc.calculate()
-        # 7*60 (daily) + 0*90 (sub, default 0 days) + 1*420 (weekly) + 1*160 (zero)
-        expected = 420 + 0 + 420 + 160
+        # 7*60 daily + 1*60 Ridu + 1*160 Hollow + no full endgame rotation
+        expected = 420 + 60 + 160
         assert result.total_polychromes_earned == expected
 
     def test_total_monochromes_used(self):
@@ -284,7 +323,7 @@ class TestEdgeCases:
 
     def test_pull_calculator_zero_days(self):
         """Test pull calculator with zero days."""
-        calc = ZZZPullCalculator(current_pulls=5, current_polychromes=320, days=0)
+        calc = ZZZPullCalculator(current_pulls=5, current_polychromes=320, days=0, start_date=date(2026, 1, 5))
         result = calc.calculate()
         assert result.total_pulls == 7  # 5 + 2
         assert result.days_calculated == 0

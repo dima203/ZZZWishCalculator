@@ -30,13 +30,15 @@ ZZZWishCalculator/
 │   ├── storage.py               # JSON-настройки в ~/.zzz_wish_calculator/settings.json
 │   └── __init__.py              # реэкспорт публичного API core (+ __all__)
 ├── tests/
-│   ├── test_calculators.py      # 41 тест: гача, экономика, edge cases
+│   ├── test_calculators.py      # 46 тестов: гача, экономика, edge cases
 │   ├── test_storage.py          # 13 тестов: JSON-хранилище, миграция дефолтов, ошибки
-│   ├── test_app.py              # 9 тестов Flet-слоя на MagicMock page (без окна)
+│   ├── test_app.py              # 10 тестов Flet-слоя на MagicMock page (без окна)
 │   ├── test_screenshot_tool.py  # 5 тестов чистых helper'ов скриншот-инструмента
 │   └── test_environment.py      # 2 теста версий flet/ruff (гейт миграции)
 ├── tools/
 │   └── screenshots.py           # boot приложения, обход вкладок, PNG в tools/screenshots/
+├── docs/
+│   └── events-research.md       # отчёт по источникам ивентов/дохода (не интегрирован)
 ├── .github/workflows/ci.yml     # ruff + pytest на push в master и на PR
 ├── requirements.txt             # flet==1.0.5, flet-desktop==1.0.5
 ├── requirements-dev.txt         # pytest==9.1.1, ruff==0.17.3
@@ -57,9 +59,11 @@ ZZZWishCalculator/
 | Экономика круток | `core/pull_calculator.py` (docstring + константы) | источники дохода, конвертация |
 | Схема настроек | `core/storage.py` (`DEFAULT_SETTINGS`) | ключи и дефолты JSON |
 | Палитра и стили | `app/app.py` (`COLORS`) | цвета, тема, размеры окна |
+| Источники ивентов | `docs/events-research.md` | HoYoLAB/HYP API, надёжность, ограничения |
 | CI-гейт | `.github/workflows/ci.yml` | ruff + pytest |
 
-Отдельной документации/README нет — источник правды по формулам: код + тесты.
+Отдельного README нет; исследование источников ивентов — `docs/events-research.md`, источник правды
+по формулам — код и тесты.
 
 ## Commands
 
@@ -73,7 +77,7 @@ python -m venv .venv
 # Приложение
 .\.venv\Scripts\python.exe main.py
 
-# Тесты (70)
+# Тесты (76)
 .\.venv\Scripts\python.exe -m pytest -q -p no:warnings
 .\.venv\Scripts\python.exe -m pytest tests/test_app.py -q
 .\.venv\Scripts\python.exe -m pytest tests/test_calculators.py::TestZZZGachaCalculator -q
@@ -133,7 +137,10 @@ python -m venv .venv
 
 ### Механика гачи
 
-- Базовый шанс 0.6% на крутках 1..74; soft pity 75..89 — линейно 20% → ~94.67%; 90-я крутка — 100%.
+- Базовый шанс 0.6% на крутках 1..73; soft pity с 74-й — оценка сообщества: +6 п.п. за крутку
+  (6.6%, 12.6%, …, 96.6% на 89-й); 90-я крутка — 100%. Официально HoYoverse публикует только
+  базовую ставку и hard pity, точная кривая не раскрыта.
+- W-Engine (справочно, в калькуляторе пока не считается): 80 hard pity, 75% на ивентовый, гарант после промаха.
 - Легендарный без гаранта: 50% ивентовый (pity → 0, гарант off) / 50% не-ивентовый (pity → 0, гарант on).
 - С гарантом: legendary всегда ивентовый, гарант снимается.
 - `_compute_distribution(pulls)` — DP по состояниям `(pity, guarantee)` с массивами длиной `pulls + 1`;
@@ -150,16 +157,20 @@ python -m venv .venv
 | `POLYCHROMES_PER_PULL` | 160 |
 | `DAILY_TASK_POLYCHROMES` | 60 / день |
 | `SUBSCRIPTION_POLYCHROMES_PER_DAY` | 90 / день (не дольше остатка подписки) |
-| `WEEKLY_MISSION_POLYCHROMES` | 420 / неделя |
-| `ZERO_HOLLOW_POLYCHROMES` | 160 / неделя |
-| `MONTHLY_SHOP_PULLS` | 5 круток 1-го числа |
+| `RIDU_WEEKLY_POLYCHROMES` | 60 / неделя |
+| `HOLLOW_ZERO_POLYCHROMES` | 160 / неделя |
+| `SHIYU_DEFENSE_POLYCHROMES` | 780 / 14-дневная ротация |
+| `DEADLY_ASSAULT_POLYCHROMES` | 300 / 14-дневная ротация |
+| `MONTHLY_SHOP_PULLS` | 5 круток 1-го числа (за Residual Signal) |
 
 - `weeks = days // 7` — неполная неделя не даёт недельный доход.
+- `rotations = days // 14` — Shiyu Defense и Deadly Assault считаются только полными ротациями.
 - Магазин: обход `start_date..start_date + days` включительно. 30 дней с 15 января всё равно задевают 1 февраля.
 - Полихромы и монохромы складываются (1:1), остаток меньше 160 отбрасывается.
 - `total_monochromes_used = min(monochromes, earned + polychromes)` — историческая формула «для отображения»,
   не равна фактическому расходу; не менять без отдельной задачи.
 - `start_date` по умолчанию `date.today()`, `end_date = start_date + timedelta(days=days)`.
+- События, компенсации и разовые награды в калькулятор не входят: их суммы официально не публикуются.
 
 ### Хранилище настроек
 
@@ -189,13 +200,13 @@ python -m venv .venv
 
 ## Testing
 
-- Всего **70** тестов, ~1 с, без сети, внешних сервисов и открытия окна.
-- `tests/test_calculators.py` — 41 тест: `TestZZZGachaCalculator` (16), `TestZZZPullCalculator` (20),
-  `TestEdgeCases` (5).
+- Всего **76** тестов, ~1 с, без сети, внешних сервисов и открытия окна.
+- `tests/test_calculators.py` — 46 тестов: `TestZZZGachaCalculator` (18), `TestZZZPullCalculator` (23),
+  `TestEdgeCases` (5). Проверяют soft pity с 74-й, доход, Ridu/Hollow/Shiyu/Deadly, месячный магазин.
 - `tests/test_storage.py` — 13 тестов: patch `core.storage._get_config_dir` / `_get_config_file` на временную
   директорию, битый JSON, `OSError`, merge с дефолтами, round-trip.
-- `tests/test_app.py` — 9 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`, `OutlineInputBorder`,
-  расчёты, ошибки валидации, сохранение настроек.
+- `tests/test_app.py` — 10 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`, `OutlineInputBorder`,
+  расчёты, ошибки валидации, сохранение настроек, свёрнутая справка по источникам.
 - `tests/test_screenshot_tool.py` — 5 тестов чистых helper'ов без запуска Flet.
 - `tests/test_environment.py` — 2 гейта: flet 1.x и установленный ruff.
 - Тесты импортируют `core.*` / `app.*`, поэтому запускать из корня (отдельного `conftest.py`/`pyproject.toml` нет).
@@ -277,3 +288,9 @@ PR не принимается при красном CI по коду. Если 
     требует desktop-окружение (в headless CI не запускается).
 11. **Версии**: `flet==1.0.5`, `pytest==9.1.1`, `ruff==0.17.3`; не смешивать 1.0.x с 0.8x API и не обновлять
     одну зависимость без прогона приложения.
+12. **Soft pity — оценка, а не официальная ставка**: 74-я крутка, +6 п.п. за крутку. Не выдавать это за
+    опубликованную HoYoverse кривую; в UI есть пометка.
+13. **Эндгейм считается полными 14-дневными ротациями** (`days // 14`); Ridu Weekly — 60/неделю, а не 420.
+    Не возвращать старые значения при «упрощении» прогноза.
+14. **Магазин — не бесплатные крутки**: 5 Encrypted Master Tapes в месяц стоят Residual Signal. Если их нет,
+    прогноз завышен; это известное допущение, а не баг.

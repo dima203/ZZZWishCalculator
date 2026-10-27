@@ -5,11 +5,20 @@ class ZZZGachaCalculator:
     """
     Калькулятор вероятностей для баннера ивентового персонажа в ZZZ.
     Механика:
-      - базовый шанс 0.6% до 74-й крутки;
-      - с 75-й крутки шанс линейно растёт от 20% до 100% на 90-й;
+      - базовый шанс 0.6% до 73-й крутки;
+      - soft pity: с 74-й крутки шанс растёт примерно на 6 п.п. за крутку (оценка сообщества);
+      - на 90-й крутке срабатывает гарант (100%);
       - при выпадении легендарного действует правило 50/50 (если нет гаранта);
       - гарант на ивентового включается после не-ивентового легендарного.
+
+    Официально HoYoverse публикует только базовую ставку и жёсткий гарант;
+    точная кривая soft pity не раскрыта и является community-оценкой.
     """
+
+    BASE_RATE: Final[float] = 0.006
+    SOFT_PITY_START: Final[int] = 74
+    SOFT_PITY_STEP: Final[float] = 0.06
+    HARD_PITY: Final[int] = 90
 
     prob_legendary: Final[list[float]]
 
@@ -24,12 +33,11 @@ class ZZZGachaCalculator:
         self.guarantee: bool = guarantee
 
         self.prob_legendary = [0.0] * 91
-        base: float = 0.006
-        for i in range(1, 75):
-            self.prob_legendary[i] = base
-        for i in range(75, 90):
-            self.prob_legendary[i] = 0.2 + (i - 75) * (0.8 / 15)
-        self.prob_legendary[90] = 1.0
+        for i in range(1, self.SOFT_PITY_START):
+            self.prob_legendary[i] = self.BASE_RATE
+        for i in range(self.SOFT_PITY_START, self.HARD_PITY):
+            self.prob_legendary[i] = self.BASE_RATE + (i - self.SOFT_PITY_START + 1) * self.SOFT_PITY_STEP
+        self.prob_legendary[self.HARD_PITY] = 1.0
 
     def _compute_distribution(self, pulls: int) -> list[float]:
         """

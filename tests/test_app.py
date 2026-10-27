@@ -33,6 +33,22 @@ def set_text_field(field: ft.Container, value: str) -> None:
     field.content.value = value
 
 
+def _collect_text(control: ft.Control) -> list[str]:
+    """Collect text values from a control tree for structural assertions."""
+    values: list[str] = []
+    if isinstance(control, ft.Text) and control.value:
+        values.append(control.value)
+    content = getattr(control, "content", None)
+    if isinstance(content, ft.Control):
+        values.extend(_collect_text(content))
+    for child in getattr(control, "controls", None) or []:
+        values.extend(_collect_text(child))
+    title = getattr(control, "title", None)
+    if isinstance(title, ft.Control):
+        values.extend(_collect_text(title))
+    return values
+
+
 def test_tabs_are_built_with_two_tabs() -> None:
     app = make_app()
 
@@ -60,6 +76,16 @@ def test_text_fields_use_outline_input_border() -> None:
     assert default_border.border_radius == 10
     assert default_border.side.width == 1.5
     assert app.guarantee_switch.content.value is False
+
+
+def test_rates_panel_is_collapsed_and_lists_verified_sources() -> None:
+    app = make_app()
+
+    assert isinstance(app.rates_info, ft.ExpansionTile)
+    assert app.rates_info.expanded is False
+    text = " ".join(_collect_text(app.rates_info))
+    for expected in ("RIDU", "HOLLOW ZERO", "SHIYU", "DEADLY ASSAULT", "780", "300"):
+        assert expected in text
 
 
 def test_wish_calculation_reports_at_least_k_copies() -> None:
