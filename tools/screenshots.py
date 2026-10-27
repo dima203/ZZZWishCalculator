@@ -26,6 +26,7 @@ from app import ZZZGachaApp
 TABS: list[tuple[str, int]] = [
     ("wish", 0),
     ("pulls", 1),
+    ("mix", 2),
 ]
 OUT_DIR = Path(__file__).resolve().parent / "screenshots"
 BOOT_SETTLE = 1.5

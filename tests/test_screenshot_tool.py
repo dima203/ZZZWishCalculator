@@ -7,9 +7,9 @@ import pytest
 from tools.screenshots import TABS, parse_selection, screenshot_path
 
 
-def test_tabs_cover_both_application_tabs() -> None:
-    assert [name for name, _ in TABS] == ["wish", "pulls"]
-    assert [index for _, index in TABS] == [0, 1]
+def test_tabs_cover_all_application_tabs() -> None:
+    assert [name for name, _ in TABS] == ["wish", "pulls", "mix"]
+    assert [index for _, index in TABS] == [0, 1, 2]
 
 
 def test_parse_selection_defaults_to_all_tabs() -> None:

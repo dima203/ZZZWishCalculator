@@ -27,16 +27,18 @@ ZZZWishCalculator/
 ├── core/
 │   ├── wish_calculator.py       # ZZZGachaCalculator — DP по состояниям (pity, guarantee)
 │   ├── pull_calculator.py       # ZZZPullCalculator + Currency / PullCalculationResult
+│   ├── mixed_calculator.py      # смешанная цель агент + W-Engine, лучший сплит
 │   ├── storage.py               # JSON-настройки в ~/.zzz_wish_calculator/settings.json
 │   ├── events.py                # HoYoLAB-ивенты, парсинг наград, кэш и оценка
 │   └── __init__.py              # реэкспорт публичного API core (+ __all__)
 ├── tests/
 │   ├── test_calculators.py      # 54 теста: гача (агент/W-Engine), экономика, диапазон
 │   ├── test_storage.py          # 14 тестов: JSON-хранилище, миграция дефолтов, ошибки
-│   ├── test_app.py              # 16 тестов Flet-слоя на MagicMock page (без окна)
+│   ├── test_app.py              # 19 тестов Flet-слоя на MagicMock page (без окна)
 │   ├── test_screenshot_tool.py  # 5 тестов чистых helper'ов скриншот-инструмента
 │   ├── test_events.py           # 10 тестов парсинга наград/дат и оценки ивентов
 │   ├── test_events_probe.py     # 7 тестов парсинга официальных новостей
+│   ├── test_mixed_calculator.py # 7 тестов смешанной цели и лучшего сплита
 │   └── test_environment.py      # 2 теста версий flet/ruff (гейт миграции)
 ├── tools/
 │   ├── screenshots.py           # boot приложения, обход вкладок, PNG в tools/screenshots/
@@ -63,6 +65,7 @@ ZZZWishCalculator/
 | Экономика круток | `core/pull_calculator.py` (docstring + константы) | источники дохода, конвертация |
 | Схема настроек | `core/storage.py` (`DEFAULT_SETTINGS`) | ключи и дефолты JSON |
 | Авто-ивенты | `core/events.py` | HoYoLAB, парсинг наград, кэш, диапазон |
+| Смешанный расчёт | `core/mixed_calculator.py` | агент + W-Engine, лучший сплит, caps M6/R5 |
 | Палитра и стили | `app/app.py` (`COLORS`) | цвета, тема, размеры окна |
 | Источники ивентов | `docs/events-research.md` | HoYoLAB/HYP API, надёжность, ограничения |
 | CI-гейт | `.github/workflows/ci.yml` | ruff + pytest |
@@ -82,7 +85,7 @@ python -m venv .venv
 # Приложение
 .\.venv\Scripts\python.exe main.py
 
-# Тесты (108)
+# Тесты (118)
 .\.venv\Scripts\python.exe -m pytest -q -p no:warnings
 .\.venv\Scripts\python.exe -m pytest tests/test_app.py -q
 .\.venv\Scripts\python.exe -m pytest tests/test_calculators.py::TestZZZGachaCalculator -q
@@ -133,10 +136,11 @@ python -m venv .venv
   (deprecated, удаление в 1.3). В проекте используется dict состояний:
   `{ft.ControlState.DEFAULT: ft.OutlineInputBorder(...), ft.ControlState.FOCUSED: ...}`.
   Цвет/толщина — `ft.BorderSide(width, color)`; радиус — `border_radius=`.
-- Вкладки: `ft.Tabs(content=ft.Column([ft.TabBar(...), ft.TabBarView(...)]), length=2, selected_index=0)`;
-  число `Tab` и `length` держать синхронными.
+- Вкладки: `ft.Tabs(content=ft.Column([ft.TabBar(...), ft.TabBarView(...)]), length=3, selected_index=0)`;
+  число `Tab` и `length` держать синхронными. Вкладки: «ШАНС», «КРУТКИ», «МИКС».
 - UI строится один раз в `__init__`: `_load_settings()` → `_setup_page()` → `_build_ui()`. `_build_ui` вызывает
-  `_build_wish_tab()` / `_build_pull_tab()`, которые создают `self.wish_tab_content` / `self.pull_tab_content`.
+  `_build_wish_tab()` / `_build_pull_tab()` / `_build_mix_tab()`, которые создают
+  `self.wish_tab_content` / `self.pull_tab_content` / `self.mix_tab_content`.
 - Поля ввода обёрнуты в `ft.Container` ради hover-эффекта, поэтому значение читается как
   `self.<field>.content.value` (не `self.<field>.value`). `guarantee_switch` — тоже контейнер со `Switch`.
 - После изменения `value` / `visible` нужен `page.update()`. В hover-хендлерах обновлять точечно:
@@ -213,6 +217,18 @@ python -m venv .venv
 - Скрипт сам добавляет корень репозитория в `sys.path`, поэтому запускается из любого CWD.
 - Скриншоты — локальная UI-приёмка; в CI их не снимают (нужен desktop-дисплей).
 
+### Смешанная цель (агент + W-Engine)
+
+- Вкладка «МИКС»: общий бюджет N, отдельные pity/гарант для агента и W-Engine, цели по копиям.
+- Для каждого сплита `a + e = N` считается `P_agent(a) * P_engine(e)`, выбирается лучший фиксированный сплит.
+  Это не адаптивная стратегия: игрок выбирает распределение заранее; баннеры независимы.
+- `core/mixed_calculator.py` считает `P(≥copies)` через DP по `(pity, guarantee, copies)`, а не полное
+  распределение для каждого `n`.
+- Caps: агент 7 копий (M6 = база + 6 дублей), W-Engine 5 копий (R5).
+- В одиночной вкладке слайдер копий меняет диапазон: 1..7 для агента, 1..5 для W-Engine; значение
+  зажимается при переключении баннера.
+- `ft.Slider` отдаёт float — всегда приводить к `int` и не допускать 0 копий.
+
 ### Events probe и авто-доход
 
 - `tools/events_probe.py` — пробный CLI: официальная лента HoYoLAB (`gids=8`, типы 1/2), фильтр
@@ -228,14 +244,15 @@ python -m venv .venv
 
 ## Testing
 
-- Всего **108** тестов, ~3 с, без сети, внешних сервисов и открытия окна.
+- Всего **118** тестов, ~3 с, без сети, внешних сервисов и открытия окна.
 - `tests/test_calculators.py` — 54 теста: `TestZZZGachaCalculator` (18), `TestWEngineBanner` (6),
   `TestZZZPullCalculator` (25), `TestEdgeCases` (5).
 - `tests/test_storage.py` — 14 тестов: patch путей, битый JSON, `OSError`, merge с дефолтами, round-trip,
   защита `DEFAULT_SETTINGS` от мутации.
-- `tests/test_app.py` — 16 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`,
-  `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек, ивенты.
+- `tests/test_app.py` — 19 тестов: `ZZZGachaApp` на `MagicMock` page, вкладки, `page.window`,
+  `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек, ивенты, микс.
 - `tests/test_events.py` — 10 тестов парсинга наград/дат, каталога, fallback и диапазона.
+- `tests/test_mixed_calculator.py` — 7 тестов caps M6/R5, лучшего сплита и сверки с полным распределением.
 - `tests/test_events_probe.py` — 7 тестов парсинга официальных новостей без сети.
 - `tests/test_screenshot_tool.py` — 5 тестов чистых helper'ов без запуска Flet.
 - `tests/test_environment.py` — 2 гейта: flet 1.x и установленный ruff.
@@ -332,3 +349,7 @@ PR не принимается при красном CI по коду. Если 
     и статус, а не исключение в UI. Каталог 3.3 обновлять при новых подтверждённых наградах.
 19. **Не парсить патчноут как ивент целиком**: в нём перечислены награды других событий; брать только
     `Compensation`, иначе `Encrypted Master Tape ×10` задваивается.
+20. **Смешанный расчёт — лучший фиксированный сплит**, а не адаптивная стратегия. `P_both = P_agent * P_engine`;
+    не выдавать это за гарантию одновременного получения.
+21. **Слайдеры копий**: агент 1..7 (M6), W-Engine 1..5 (R5); при переключении баннера значение зажимается,
+    `Slider.value` — float, приводить к `int`. Ноль копий больше не допускается.
