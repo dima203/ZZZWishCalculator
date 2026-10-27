@@ -1,0 +1,226 @@
+{
+  "generated_at": "2026-10-27T13:30:26.025183+00:00",
+  "error": null,
+  "events": [
+    {
+      "post_id": "46039426",
+      "title": "🎁 Dear Proxies, the Version 3.1 \"Return to Ridu: Feathers of Reunion\" web event is still underway!",
+      "start": "2026-07-29",
+      "end": "2026-09-09",
+      "polychromes": 400,
+      "tapes": 0,
+      "confidence": "explicit",
+      "url": "https://www.hoyolab.com/article/46039426"
+    },
+    {
+      "post_id": "46038839",
+      "title": "🎁 \"Phaethon's Grand Reveal of the Year\" Special Program is now live! Join the event to win exclusive decorations!",
+      "start": "2026-07-29",
+      "end": "2026-08-19",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/46038839"
+    },
+    {
+      "post_id": "46038142",
+      "title": "🎁 Version 3.1 Twitch Drops Event Now Live ",
+      "start": "2026-07-29",
+      "end": "2026-08-19",
+      "polychromes": 50,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/46038142"
+    },
+    {
+      "post_id": "46172453",
+      "title": "[Prize Event] 📸 Click! Zenless Zone Zero Snap Photography Club",
+      "start": "2026-08-07",
+      "end": "2026-08-21",
+      "polychromes": 50,
+      "tapes": 0,
+      "confidence": "explicit",
+      "url": "https://www.hoyolab.com/article/46172453"
+    },
+    {
+      "post_id": "46604642",
+      "title": "\"Angels Support Operation\" Event Details",
+      "start": "2026-09-07",
+      "end": "2026-11-30",
+      "polychromes": 0,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/46604642"
+    },
+    {
+      "post_id": "46622788",
+      "title": "Version 3.2 \"Their Secret Histories\" Update Announcement",
+      "start": "2026-09-08",
+      "end": "2026-10-20",
+      "polychromes": 600,
+      "tapes": 0,
+      "confidence": "explicit",
+      "url": "https://www.hoyolab.com/article/46622788"
+    },
+    {
+      "post_id": "46615065",
+      "title": "\"All-New Program\" Event Details",
+      "start": "2026-09-08",
+      "end": "2026-10-20",
+      "polychromes": 0,
+      "tapes": 10,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/46615065"
+    },
+    {
+      "post_id": "46614974",
+      "title": "\"Potential Hypothesis: Reforged in Fire\" Event Details",
+      "start": "2026-09-08",
+      "end": "2026-10-20",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46614974"
+    },
+    {
+      "post_id": "46624270",
+      "title": "[Prize Event] Vyrium Vacation Album",
+      "start": "2026-09-09",
+      "end": "2026-10-10",
+      "polychromes": 30,
+      "tapes": 0,
+      "confidence": "explicit",
+      "url": "https://www.hoyolab.com/article/46624270"
+    },
+    {
+      "post_id": "46623562",
+      "title": "🎁 Version 3.2 Twitch Drops Event Now Live",
+      "start": "2026-09-09",
+      "end": "2026-09-30",
+      "polychromes": 50,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/46623562"
+    },
+    {
+      "post_id": "46615127",
+      "title": "\"Clink, Clank, Pinball Knight!\" Event Details",
+      "start": "2026-09-10",
+      "end": "2026-10-19",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46615127"
+    },
+    {
+      "post_id": "46688701",
+      "title": "\"Shadow Chase Showdown\" Event Details",
+      "start": "2026-09-16",
+      "end": "2026-10-05",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46688701"
+    },
+    {
+      "post_id": "46771839",
+      "title": "\"Advanced Bounty: Area Patrol\" Event Details",
+      "start": "2026-09-23",
+      "end": "2026-09-28",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46771839"
+    },
+    {
+      "post_id": "46771693",
+      "title": "\"Surprise Screening Plan\" Event Details",
+      "start": "2026-09-23",
+      "end": "2026-10-20",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46771693"
+    },
+    {
+      "post_id": "46864094",
+      "title": "\"Diary of an Orbie Parent\" Event Details",
+      "start": "2026-09-30",
+      "end": "2026-10-19",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46864094"
+    },
+    {
+      "post_id": "46913357",
+      "title": "\"Chronicles of the Hobbling Crow\" Event Details",
+      "start": "2026-10-03",
+      "end": "2026-10-19",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/46913357"
+    },
+    {
+      "post_id": "47055658",
+      "title": "\"Data Bounty: Combat Simulation\" Event Details",
+      "start": "2026-10-14",
+      "end": "2026-10-19",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "estimate",
+      "url": "https://www.hoyolab.com/article/47055658"
+    },
+    {
+      "post_id": "47149468",
+      "title": "Version 3.3 \"Journey to the Sky\" Update Announcement",
+      "start": "2026-10-20",
+      "end": "2026-12-01",
+      "polychromes": 600,
+      "tapes": 0,
+      "confidence": "explicit",
+      "url": "https://www.hoyolab.com/article/47149468"
+    },
+    {
+      "post_id": "47142288",
+      "title": "\"All-New Program\" Event Details",
+      "start": "2026-10-20",
+      "end": "2026-12-01",
+      "polychromes": 0,
+      "tapes": 10,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/47142288"
+    },
+    {
+      "post_id": "47150244",
+      "title": "🎁 Version 3.3 Twitch Drops Event Now Live",
+      "start": "2026-10-21",
+      "end": "2026-11-11",
+      "polychromes": 50,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/47150244"
+    },
+    {
+      "post_id": "47142378",
+      "title": "\"Spooky Funhouse Tales\" Event Details",
+      "start": "2026-10-22",
+      "end": "2026-11-30",
+      "polychromes": 900,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/47142378"
+    },
+    {
+      "post_id": "47208493",
+      "title": "\"Cyber Miracle Healer, on Duty!\" Event Details",
+      "start": "2026-10-28",
+      "end": "2026-11-16",
+      "polychromes": 300,
+      "tapes": 0,
+      "confidence": "catalog",
+      "url": "https://www.hoyolab.com/article/47208493"
+    }
+  ]
+}
