@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZZZ Signal Lab — калькулятор круток</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.28.2/full/pyodide.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <div class="logo">Z</div>
+      <div>
+        <h1>ZZZ SIGNAL LAB</h1>
+        <p>Zenless Zone Zero · калькулятор круток</p>
+      </div>
+    </div>
+    <span class="status-dot" id="runtime-status">Загрузка Python…</span>
+  </header>
+
+  <nav class="tabs" aria-label="Разделы">
+    <button class="tab active" data-tab="wish" type="button">ШАНС</button>
+    <button class="tab" data-tab="pulls" type="button">КРУТКИ</button>
+    <button class="tab" data-tab="mix" type="button">МИКС</button>
+  </nav>
+
+  <main>
+    <section class="panel" id="panel-wish">
+      <div class="section-title">
+        <span class="section-icon">🎲</span>
+        <div>
+          <h2>ШАНС НА ИВЕНТ</h2>
+          <p id="wish-subtitle">канал агента · 50/50 · hard pity 90</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="segmented" id="banner-select">
+          <button class="segment active" data-banner="agent" type="button">АГЕНТ · 90</button>
+          <button class="segment" data-banner="w_engine" type="button">W-ENGINE · 80</button>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            <span>КРУТОК БЕЗ S-РАНГА</span>
+            <input id="wish-pity" type="number" min="0" max="89" value="30" inputmode="numeric">
+            <small id="wish-pity-hint">0–89</small>
+          </label>
+          <label class="field">
+            <span>КРУТОК (N)</span>
+            <input id="wish-pulls" type="number" min="0" max="500" value="50" inputmode="numeric">
+            <small>план</small>
+          </label>
+        </div>
+
+        <label class="field slider-field">
+          <span>КОПИЙ <output id="wish-copies-label">M0 · 1 копия</output></span>
+          <input id="wish-copies" type="range" min="1" max="7" step="1" value="1">
+        </label>
+
+        <label class="switch-row">
+          <span class="icon">🛡️</span>
+          <span><strong>ГАРАНТ</strong><small id="wish-guarantee-hint">следующий S — ивент</small></span>
+          <input id="wish-guarantee" type="checkbox">
+        </label>
+
+        <button class="primary" id="wish-calc" type="button">РАССЧИТАТЬ ШАНС</button>
+        <div class="progress" id="wish-progress" hidden><span class="ring"></span>СЧИТАЕМ…</div>
+
+        <div class="result" id="wish-result" hidden>
+          <div class="result-head">РЕЗУЛЬТАТ</div>
+          <div class="big" id="wish-result-value"></div>
+          <div class="bar"><span id="wish-result-bar"></span></div>
+          <div class="hint" id="wish-result-hint"></div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div><strong id="wish-hard">90</strong><small>HARD PITY</small></div>
+        <div><strong id="wish-guarantee-stat">180</strong><small>ГАРАНТ ИВЕНТА</small></div>
+        <div><strong>0.6%</strong><small>БАЗА</small></div>
+      </div>
+      <p class="fineprint">Soft pity — оценка сообщества: агент ~74-я, W-Engine ~65-я; +6 п.п. за крутку.</p>
+    </section>
+
+    <section class="panel" id="panel-pulls" hidden>
+      <div class="section-title">
+        <span class="section-icon">📅</span>
+        <div>
+          <h2>ПРОГНОЗ КРУТОК</h2>
+          <p>daily · weekly · endgame · магазин</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="grid two">
+          <label class="field"><span>ТЕКУЩИЕ КРУТКИ</span><input id="pull-current" type="number" min="0" value="0"></label>
+          <label class="field"><span>ПОЛИХРОМЫ</span><input id="pull-poly" type="number" min="0" value="0"></label>
+          <label class="field"><span>МОНОХРОМЫ</span><input id="pull-mono" type="number" min="0" value="0"></label>
+          <label class="field"><span>ДНИ ПОДПИСКИ</span><input id="pull-sub" type="number" min="0" value="0"></label>
+          <label class="field"><span>ПЕРИОД, ДНЕЙ</span><input id="pull-days" type="number" min="1" value="30"></label>
+        </div>
+
+        <label class="switch-row">
+          <span class="icon">🎁</span>
+          <span><strong>УЧИТЫВАТЬ ИВЕНТЫ</strong><small id="events-status">снимок на дату сборки</small></span>
+          <input id="pull-events" type="checkbox" checked>
+        </label>
+
+        <button class="primary" id="pull-calc" type="button">РАССЧИТАТЬ КРУТКИ</button>
+        <div class="progress" id="pull-progress" hidden><span class="ring"></span>СЧИТАЕМ…</div>
+
+        <div class="result" id="pull-result" hidden>
+          <div class="result-head">ПРОГНОЗ</div>
+          <div class="big" id="pull-result-value"></div>
+          <div class="hint" id="pull-result-hint"></div>
+          <pre id="pull-result-details"></pre>
+        </div>
+      </div>
+
+      <details class="rates">
+        <summary>КУРСЫ И ИСТОЧНИКИ <small>проверенные значения · ивенты — снимок</small></summary>
+        <div class="rate-row"><span>1 КРУТКА</span><strong>160 ПОЛИХРОМОВ</strong></div>
+        <div class="rate-row"><span>1 МОНОХРОМ</span><strong>1 ПОЛИХРОМ</strong></div>
+        <div class="rate-row"><span>ЕЖЕДНЕВКИ</span><strong>60 / ДЕНЬ</strong></div>
+        <div class="rate-row"><span>ПОДПИСКА</span><strong>90 / ДЕНЬ</strong></div>
+        <div class="rate-row"><span>RIDU WEEKLY</span><strong>60 / НЕД</strong></div>
+        <div class="rate-row"><span>HOLLOW ZERO</span><strong>160 / НЕД</strong></div>
+        <div class="rate-row"><span>SHIYU DEFENSE</span><strong>780 / 14 ДН</strong></div>
+        <div class="rate-row"><span>DEADLY ASSAULT</span><strong>300 / 14 ДН</strong></div>
+        <div class="rate-row"><span>SIGNAL SHOP</span><strong>5 КРУТОК / МЕС</strong></div>
+      </details>
+    </section>
+
+    <section class="panel" id="panel-mix" hidden>
+      <div class="section-title">
+        <span class="section-icon">✨</span>
+        <div>
+          <h2>АГЕНТ + W-ENGINE</h2>
+          <p>общий бюджет · независимые баннеры · лучший сплит</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <label class="field"><span>ВСЕГО КРУТОК</span><input id="mix-total" type="number" min="1" max="360" value="180"></label>
+        <div class="grid two">
+          <label class="field"><span>ПИТИ АГЕНТА</span><input id="mix-agent-pity" type="number" min="0" max="89" value="0"><small>0–89</small></label>
+          <label class="field"><span>ПИТИ W-ENGINE</span><input id="mix-engine-pity" type="number" min="0" max="79" value="0"><small>0–79</small></label>
+        </div>
+        <div class="grid two">
+          <label class="switch-row compact"><span class="icon">🛡️</span><span><strong>ГАРАНТ АГЕНТА</strong><small>следующий S — ивент</small></span><input id="mix-agent-guarantee" type="checkbox"></label>
+          <label class="switch-row compact"><span class="icon">🛡️</span><span><strong>ГАРАНТ W-ENGINE</strong><small>следующий S — оружие</small></span><input id="mix-engine-guarantee" type="checkbox"></label>
+        </div>
+        <div class="grid two">
+          <label class="field slider-field">
+            <span>КОПИЙ АГЕНТА <output id="mix-agent-copies-label">M1 · 2 копии</output></span>
+            <input id="mix-agent-copies" type="range" min="1" max="7" step="1" value="2">
+          </label>
+          <label class="field slider-field">
+            <span>КОПИЙ W-ENGINE <output id="mix-engine-copies-label">R1 · 1 копия</output></span>
+            <input id="mix-engine-copies" type="range" min="1" max="5" step="1" value="1">
+          </label>
+        </div>
+
+        <button class="primary" id="mix-calc" type="button">РАССЧИТАТЬ МИКС</button>
+        <div class="progress" id="mix-progress" hidden><span class="ring"></span>СЧИТАЕМ…</div>
+
+        <div class="result" id="mix-result" hidden>
+          <div class="result-head">СМЕШАННАЯ ЦЕЛЬ</div>
+          <div class="big" id="mix-result-value"></div>
+          <div class="bar"><span id="mix-result-bar"></span></div>
+          <div class="hint">лучший фиксированный сплит · баннеры независимы</div>
+          <pre id="mix-result-details"></pre>
+        </div>
+      </div>
+      <p class="fineprint">Слайдер копий: агент до M6 (7 копий), W-Engine до R5 (5 копий).</p>
+    </section>
+  </main>
+
+  <footer>
+    <span>Локальный расчёт · без сохранения настроек</span>
+    <span id="build-note">Python в браузере через Pyodide</span>
+  </footer>
+</body>
+</html>

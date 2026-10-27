@@ -39,11 +39,18 @@ ZZZWishCalculator/
 │   ├── test_events.py           # 10 тестов парсинга наград/дат и оценки ивентов
 │   ├── test_events_probe.py     # 7 тестов парсинга официальных новостей
 │   ├── test_mixed_calculator.py # 7 тестов смешанной цели и лучшего сплита
+│   ├── test_web_bridge.py      # 6 тестов адаптера для Pyodide
+│   ├── test_web_build.py       # 5 тестов синхронизации docs/ с core/
 │   └── test_environment.py      # 2 теста версий flet/ruff (гейт миграции)
 ├── tools/
 │   ├── screenshots.py           # boot приложения, обход вкладок, PNG в tools/screenshots/
-│   └── events_probe.py          # пробный отчёт по официальным новостям HoYoLAB
+│   ├── events_probe.py          # пробный отчёт по официальным новостям HoYoLAB
+│   └── build_web.py             # сборка docs/ для GitHub Pages
 ├── docs/
+│   ├── index.html               # статическая web-версия (Pyodide)
+│   ├── styles.css / app.js      # UI и вызовы Python-ядра
+│   ├── py/                      # сгенерированные копии core/ + web_bridge.py
+│   ├── data/events.json         # снимок ивентов на дату сборки
 │   └── events-research.md       # отчёт по источникам ивентов/дохода
 ├── .github/workflows/ci.yml     # ruff + pytest на push в master и на PR
 ├── requirements.txt             # flet==1.0.5, flet-desktop==1.0.5, httpx
@@ -85,7 +92,7 @@ python -m venv .venv
 # Приложение
 .\.venv\Scripts\python.exe main.py
 
-# Тесты (118)
+# Тесты (129)
 .\.venv\Scripts\python.exe -m pytest -q -p no:warnings
 .\.venv\Scripts\python.exe -m pytest tests/test_app.py -q
 .\.venv\Scripts\python.exe -m pytest tests/test_calculators.py::TestZZZGachaCalculator -q
@@ -103,6 +110,9 @@ python -m venv .venv
 # Пробный отчёт по официальным новостям/ивентам (без записи в настройки)
 .\.venv\Scripts\python.exe tools\events_probe.py --details
 .\.venv\Scripts\python.exe tools\events_probe.py --type 2 --limit 5 --json
+
+# Статическая web-версия для GitHub Pages (docs/)
+.\.venv\Scripts\python.exe tools\build_web.py
 ```
 
 - Версии зафиксированы: Python 3.12.6, `flet==1.0.5` (`flet-desktop==1.0.5`), `pytest==9.1.1`, `ruff==0.17.3`,
@@ -210,9 +220,7 @@ python -m venv .venv
 
 ### Screenshot tool
 
-- `tools/screenshots.py` поднимает настоящее приложение (не моки), включает `page.enable_screenshots = True`,
-  переключает `app.tabs.selected_index`, ждёт перерисовку и вызывает `await page.take_screenshot()`.
-- Артефакты: `tools/screenshots/01-wish.png`, `02-pulls.png`; папка в `.gitignore`.
+- `tools/screenshots.py` ... артефакты: `01-wish.png`, `02-pulls.png`, `03-mix.png`; папка в `.gitignore`.
 - Имена табов и индексы — в `TABS`; `parse_selection()` и `screenshot_path()` чистые и покрыты тестами.
 - Скрипт сам добавляет корень репозитория в `sys.path`, поэтому запускается из любого CWD.
 - Скриншоты — локальная UI-приёмка; в CI их не снимают (нужен desktop-дисплей).
@@ -242,9 +250,23 @@ python -m venv .venv
 - В патчноуте (`update announcement`) считаются только строки `Compensation`, иначе талоны других
   ивентов задваиваются.
 
+### GitHub Pages / web-версия
+
+- Flet-десктоп нельзя выложить на Pages as-is: нужен Python backend. В `docs/` лежит самостоятельная
+  статическая версия на **Pyodide** (Python в WASM), использующая копии `core/`.
+- GitHub Pages: Settings → Pages → Deploy from a branch → `master` / `/docs`. Actions не обязательны
+  (и недоступны из-за биллинга); `.nojekyll` уже есть.
+- Настройки **не сохраняются**: нет localStorage/sessionStorage/cookies, значения сбрасываются при reload.
+- `tools/build_web.py` копирует `core/*.py`, `web_bridge.py` и снимок ивентов `docs/data/events.json`.
+  После изменения `core/` или `web_bridge.py` обязательно запустить сборку: `tests/test_web_build.py`
+  проверяет синхронизацию копий.
+- Web-версия грузит Pyodide с CDN, поэтому нужен интернет; события — снимок на дату сборки
+  (CORS HoYoLAB из браузера не работает), сумма пересчитывается по датам/периоду.
+- Локальная проверка: `python -m http.server 8765 --directory docs` и открыть `http://127.0.0.1:8765/`.
+
 ## Testing
 
-- Всего **118** тестов, ~3 с, без сети, внешних сервисов и открытия окна.
+- Всего **129** тестов, ~3 с, без сети, внешних сервисов и открытия окна.
 - `tests/test_calculators.py` — 54 теста: `TestZZZGachaCalculator` (18), `TestWEngineBanner` (6),
   `TestZZZPullCalculator` (25), `TestEdgeCases` (5).
 - `tests/test_storage.py` — 14 тестов: patch путей, битый JSON, `OSError`, merge с дефолтами, round-trip,
@@ -253,6 +275,8 @@ python -m venv .venv
   `OutlineInputBorder`, баннеры, прогресс, расчёты, ошибки валидации, сохранение настроек, ивенты, микс.
 - `tests/test_events.py` — 10 тестов парсинга наград/дат, каталога, fallback и диапазона.
 - `tests/test_mixed_calculator.py` — 7 тестов caps M6/R5, лучшего сплита и сверки с полным распределением.
+- `tests/test_web_bridge.py` — 6 тестов адаптера Pyodide: шанс, прогноз, события, микс.
+- `tests/test_web_build.py` — 5 тестов синхронизации `docs/py` с `core/` и наличия web-ассетов.
 - `tests/test_events_probe.py` — 7 тестов парсинга официальных новостей без сети.
 - `tests/test_screenshot_tool.py` — 5 тестов чистых helper'ов без запуска Flet.
 - `tests/test_environment.py` — 2 гейта: flet 1.x и установленный ruff.
@@ -353,3 +377,9 @@ PR не принимается при красном CI по коду. Если 
     не выдавать это за гарантию одновременного получения.
 21. **Слайдеры копий**: агент 1..7 (M6), W-Engine 1..5 (R5); при переключении баннера значение зажимается,
     `Slider.value` — float, приводить к `int`. Ноль копий больше не допускается.
+22. **Flet-десктоп ≠ GitHub Pages**: не пытаться выложить `main.py`/`.venv` как статику. Web-версия живёт
+    в `docs/` и запускает Python через Pyodide; настройки не сохраняются by design.
+23. **После изменения `core/` или `web_bridge.py`** запускать `tools/build_web.py`; иначе `docs/py`
+    разъедется с источником и `test_web_build` упадёт.
+24. **HoYoLAB не отдаёт CORS браузеру**: events на Pages — снимок `docs/data/events.json` на дату сборки,
+    а не live-запрос. Не обещать live-ивенты в web-версии.
