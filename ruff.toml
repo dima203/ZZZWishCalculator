@@ -49,6 +49,7 @@ ignore = [
 ]
 # CLI-утилита печатает прогресс и намеренно продолжает после сбоя одного таба.
 "tools/screenshots.py" = ["T20", "blind-except", "module-import-not-at-top-of-file"]
+"tools/events_probe.py" = ["T20"]
 # Точка входа: ft.run(main) — публичный контракт Flet, не «модульный» импорт.
 "main.py" = ["module-import-not-at-top-of-file"]
 

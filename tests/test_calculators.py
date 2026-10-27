@@ -125,6 +125,39 @@ class TestZZZGachaCalculator:
         assert prob_at_least_one > 0.5  # Should be decent chance with 90 pulls
 
 
+class TestWEngineBanner:
+    """Tests for the W-Engine channel: 80 pity, 75/25 featured rate."""
+
+    def test_spec_and_soft_pity(self):
+        calc = ZZZGachaCalculator(banner="w_engine")
+        assert calc.hard_pity == 80
+        assert calc.featured_rate == pytest.approx(0.75)
+        assert calc.prob_legendary[64] == pytest.approx(0.006)
+        assert calc.prob_legendary[65] == pytest.approx(0.066)
+        assert calc.prob_legendary[79] == pytest.approx(0.906)
+        assert calc.prob_legendary[80] == 1.0
+
+    def test_75_25_without_guarantee(self):
+        calc = ZZZGachaCalculator(banner="w_engine")
+        assert calc.probability_k(1, 1) == pytest.approx(0.0045)
+
+    def test_hard_pity_featured_chance(self):
+        calc = ZZZGachaCalculator(current_pity=79, banner="w_engine")
+        assert calc.probability_k(1, 1) == pytest.approx(0.75)
+
+    def test_guarantee_on_w_engine(self):
+        calc = ZZZGachaCalculator(banner="w_engine", guarantee=True)
+        assert calc.probability_k(1, 1) == pytest.approx(0.006)
+
+    def test_pity_validation(self):
+        with pytest.raises(ValueError, match="current_pity must be between 0 and 79"):
+            ZZZGachaCalculator(current_pity=80, banner="w_engine")
+
+    def test_unknown_banner(self):
+        with pytest.raises(ValueError, match="unknown banner"):
+            ZZZGachaCalculator(banner="bangboo")
+
+
 class TestZZZPullCalculator:
     """Tests for ZZZPullCalculator - pull income calculations."""
 
@@ -261,17 +294,35 @@ class TestZZZPullCalculator:
         # 30 daily (1800) + 30 subscription (2700) + 4 Ridu (240) + 4 Hollow (640)
         # + 2 Shiyu (1560) + 2 Deadly Assault (600) = 7540 earned.
         # Current: 5 pulls + (160+160+7540)//160 + 5 shop = 5 + 49 + 5 = 59.
-        assert result.total_pulls == 59
+        assert result.total_pulls_min == 45
+        assert result.total_pulls_max == 59
+        assert result.total_pulls == result.total_pulls_max
+
+    def test_total_pulls_range_excludes_endgame(self):
+        """The lower bound excludes Shiyu Defense and Deadly Assault."""
+        calc = ZZZPullCalculator(days=14, start_date=date(2026, 1, 5))
+        result = calc.calculate()
+        # Base: daily 840 + Ridu 120 + Hollow 320 = 1280 -> 8 pulls.
+        # Full: + Shiyu 780 + Deadly 300 = 2360 -> 14 pulls.
+        assert (result.total_pulls_min, result.total_pulls_max) == (8, 14)
+
+    def test_short_period_has_no_range(self):
+        """Without a full 14-day rotation the range collapses."""
+        calc = ZZZPullCalculator(days=13, start_date=date(2026, 1, 5))
+        result = calc.calculate()
+        assert result.total_pulls_min == result.total_pulls_max
 
     def test_get_detailed_breakdown(self):
         """Test detailed breakdown dictionary."""
         calc = ZZZPullCalculator(current_pulls=5, days=0, start_date=date(2026, 1, 5))
         breakdown = calc.get_detailed_breakdown()
         assert breakdown["Текущие крутки"] == 5
-        assert breakdown["Итого круток"] == 5
+        assert breakdown["Итого круток (мин.)"] == 5
+        assert breakdown["Итого круток (макс.)"] == 5
         assert "Ridu Weekly" in breakdown
-        assert "Shiyu Defense" in breakdown
-        assert "Deadly Assault" in breakdown
+        assert "Shiyu Defense (макс.)" in breakdown
+        assert "Deadly Assault (макс.)" in breakdown
+        assert "Итого круток (мин.)" in breakdown
         assert "Дней в расчёте" in breakdown
 
     def test_days_calculated_in_result(self):

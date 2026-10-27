@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "guarantee": False,
         "pulls": 50,
         "copies": 1,
+        "banner": "agent",
     },
     "pull": {
         "current_pulls": 0,
@@ -40,13 +42,13 @@ def load_settings() -> dict[str, Any]:
     ensure_config_dir()
     config_file = _get_config_file()
     if not config_file.exists():
-        return DEFAULT_SETTINGS.copy()
+        return deepcopy(DEFAULT_SETTINGS)
 
     try:
         with open(config_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        result = DEFAULT_SETTINGS.copy()
+        result = deepcopy(DEFAULT_SETTINGS)
         for key, value in data.items():
             if key in result and isinstance(value, dict):
                 result[key].update(value)
@@ -54,7 +56,7 @@ def load_settings() -> dict[str, Any]:
                 result[key] = value
         return result
     except (OSError, json.JSONDecodeError):
-        return DEFAULT_SETTINGS.copy()
+        return deepcopy(DEFAULT_SETTINGS)
 
 
 def save_settings(settings: dict[str, Any]) -> bool:
@@ -74,7 +76,13 @@ def get_wish_settings() -> dict[str, Any]:
     return load_settings().get("wish", DEFAULT_SETTINGS["wish"])
 
 
-def save_wish_settings(pity: int, guarantee: bool, pulls: int, copies: int) -> bool:
+def save_wish_settings(
+    pity: int,
+    guarantee: bool,
+    pulls: int,
+    copies: int,
+    banner: str = "agent",
+) -> bool:
     """Сохраняет настройки калькулятора шансов."""
     settings = load_settings()
     settings["wish"] = {
@@ -82,6 +90,7 @@ def save_wish_settings(pity: int, guarantee: bool, pulls: int, copies: int) -> b
         "guarantee": guarantee,
         "pulls": pulls,
         "copies": copies,
+        "banner": banner,
     }
     return save_settings(settings)
 

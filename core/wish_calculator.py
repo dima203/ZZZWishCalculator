@@ -1,43 +1,81 @@
+from dataclasses import dataclass
 from typing import Final
+
+
+@dataclass(frozen=True)
+class BannerSpec:
+    """Параметры канала Signal Search."""
+
+    key: str
+    label: str
+    hard_pity: int
+    soft_pity_start: int
+    featured_rate: float
+
+
+BANNERS: Final[dict[str, BannerSpec]] = {
+    "agent": BannerSpec(
+        key="agent",
+        label="Агент",
+        hard_pity=90,
+        soft_pity_start=74,
+        featured_rate=0.5,
+    ),
+    "w_engine": BannerSpec(
+        key="w_engine",
+        label="W-Engine",
+        hard_pity=80,
+        soft_pity_start=65,
+        featured_rate=0.75,
+    ),
+}
 
 
 class ZZZGachaCalculator:
     """
-    Калькулятор вероятностей для баннера ивентового персонажа в ZZZ.
+    Калькулятор вероятностей для каналов агентов и W-Engine в ZZZ.
     Механика:
-      - базовый шанс 0.6% до 73-й крутки;
-      - soft pity: с 74-й крутки шанс растёт примерно на 6 п.п. за крутку (оценка сообщества);
-      - на 90-й крутке срабатывает гарант (100%);
-      - при выпадении легендарного действует правило 50/50 (если нет гаранта);
-      - гарант на ивентового включается после не-ивентового легендарного.
+      - базовый шанс 0.6% до начала soft pity;
+      - soft pity: +6 п.п. за крутку (оценка сообщества; точная кривая не раскрыта);
+      - hard pity: 90 для агента, 80 для W-Engine;
+      - featured rate: 50/50 для агента, 75/25 для W-Engine;
+      - гарант на ивентовый включается после не-ивентового S-ранга.
 
-    Официально HoYoverse публикует только базовую ставку и жёсткий гарант;
-    точная кривая soft pity не раскрыта и является community-оценкой.
+    Официально HoYoverse публикует только базовую ставку и hard pity.
     """
 
     BASE_RATE: Final[float] = 0.006
-    SOFT_PITY_START: Final[int] = 74
     SOFT_PITY_STEP: Final[float] = 0.06
-    HARD_PITY: Final[int] = 90
 
     prob_legendary: Final[list[float]]
 
-    def __init__(self, current_pity: int = 0, guarantee: bool = False) -> None:
+    def __init__(self, current_pity: int = 0, guarantee: bool = False, banner: str = "agent") -> None:
         """
-        :param current_pity: сколько круток уже сделано после последнего легендарного (0..89)
-        :param guarantee: True, если следующий легендарный гарантированно будет ивентовым
+        :param current_pity: сколько круток уже сделано после последнего S-ранга
+        :param guarantee: True, если следующий S-ранг гарантированно ивентовый
+        :param banner: "agent" или "w_engine"
         """
-        if not (0 <= current_pity <= 89):
-            raise ValueError("current_pity must be between 0 and 89")
+        if banner not in BANNERS:
+            raise ValueError(f"unknown banner: {banner}")
+
+        self.spec: Final[BannerSpec] = BANNERS[banner]
+        self.banner: Final[str] = banner
+        self.hard_pity: Final[int] = self.spec.hard_pity
+        self.soft_pity_start: Final[int] = self.spec.soft_pity_start
+        self.featured_rate: Final[float] = self.spec.featured_rate
+
+        if not (0 <= current_pity < self.hard_pity):
+            raise ValueError(f"current_pity must be between 0 and {self.hard_pity - 1}")
+
         self.current_pity: int = current_pity
         self.guarantee: bool = guarantee
 
-        self.prob_legendary = [0.0] * 91
-        for i in range(1, self.SOFT_PITY_START):
+        self.prob_legendary = [0.0] * (self.hard_pity + 1)
+        for i in range(1, self.soft_pity_start):
             self.prob_legendary[i] = self.BASE_RATE
-        for i in range(self.SOFT_PITY_START, self.HARD_PITY):
-            self.prob_legendary[i] = self.BASE_RATE + (i - self.SOFT_PITY_START + 1) * self.SOFT_PITY_STEP
-        self.prob_legendary[self.HARD_PITY] = 1.0
+        for i in range(self.soft_pity_start, self.hard_pity):
+            self.prob_legendary[i] = self.BASE_RATE + (i - self.soft_pity_start + 1) * self.SOFT_PITY_STEP
+        self.prob_legendary[self.hard_pity] = 1.0
 
     def _compute_distribution(self, pulls: int) -> list[float]:
         """
@@ -49,7 +87,7 @@ class ZZZGachaCalculator:
             raise ValueError("pulls must be non-negative")
 
         # Состояние: (pity, guarantee) -> массив вероятностей по k (длина pulls+1)
-        # pity — текущий счётчик до легендарного (0..89)
+        # pity — текущий счётчик до S-ранга (0..hard_pity-1)
         # guarantee — bool
         init_arr: list[float] = [0.0] * (pulls + 1)
         init_arr[0] = 1.0
@@ -70,8 +108,8 @@ class ZZZGachaCalculator:
                     if guar:
                         self._add_transition(new_states, (0, False), prob_arr, p_leg, shift=1)
                     else:
-                        prob_event = p_leg * 0.5
-                        prob_non_event = p_leg * 0.5
+                        prob_event = p_leg * self.featured_rate
+                        prob_non_event = p_leg * (1.0 - self.featured_rate)
                         self._add_transition(new_states, (0, False), prob_arr, prob_event, shift=1)
                         self._add_transition(new_states, (0, True), prob_arr, prob_non_event, shift=0)
 
