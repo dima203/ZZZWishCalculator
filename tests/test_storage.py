@@ -6,14 +6,14 @@ from unittest.mock import patch
 import pytest
 
 from core.storage import (
-    load_settings,
-    save_settings,
-    get_wish_settings,
-    save_wish_settings,
-    get_pull_settings,
-    save_pull_settings,
     DEFAULT_SETTINGS,
     ensure_config_dir,
+    get_pull_settings,
+    get_wish_settings,
+    load_settings,
+    save_pull_settings,
+    save_settings,
+    save_wish_settings,
 )
 
 
@@ -29,6 +29,7 @@ class TestStorage:
     def teardown_method(self):
         """Удаляет временные файлы после тестов."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_ensure_config_dir_creates_directory(self):
@@ -48,8 +49,13 @@ class TestStorage:
         """Проверяет загрузку настроек из файла."""
         test_settings = {
             "wish": {"pity": 50, "guarantee": True, "pulls": 100, "copies": 2},
-            "pull": {"current_pulls": 10, "current_polychromes": 1600, "current_monochromes": 80,
-                     "subscription_days": 15, "days": 60},
+            "pull": {
+                "current_pulls": 10,
+                "current_polychromes": 1600,
+                "current_monochromes": 80,
+                "subscription_days": 15,
+                "days": 60,
+            },
         }
 
         with patch("core.storage._get_config_file", return_value=self.temp_config_file):
@@ -80,8 +86,7 @@ class TestStorage:
         """Проверяет обработку поврежденного JSON файла."""
         with patch("core.storage._get_config_file", return_value=self.temp_config_file):
             self.temp_config_dir.mkdir(parents=True, exist_ok=True)
-            with open(self.temp_config_file, "w", encoding="utf-8") as f:
-                f.write("{ invalid json }")
+            Path(self.temp_config_file).write_text("{ invalid json }", encoding="utf-8")
 
             settings = load_settings()
             assert settings == DEFAULT_SETTINGS
@@ -90,13 +95,15 @@ class TestStorage:
         """Проверяет создание файла при сохранении."""
         test_settings = {"wish": {"pity": 10}, "pull": {"days": 7}}
 
-        with patch("core.storage._get_config_dir", return_value=self.temp_config_dir), \
-                patch("core.storage._get_config_file", return_value=self.temp_config_file):
+        with (
+            patch("core.storage._get_config_dir", return_value=self.temp_config_dir),
+            patch("core.storage._get_config_file", return_value=self.temp_config_file),
+        ):
             result = save_settings(test_settings)
             assert result is True
             assert self.temp_config_file.exists()
 
-            with open(self.temp_config_file, "r", encoding="utf-8") as f:
+            with open(self.temp_config_file, encoding="utf-8") as f:
                 saved = json.load(f)
             assert saved == test_settings
 
@@ -104,9 +111,11 @@ class TestStorage:
         """Проверяет возврат False при ошибке сохранения."""
         # На Windows невозможно создать файл в несуществующем пути без прав
         # Используем мок для симуляции ошибки IOError
-        with patch("core.storage._get_config_dir", return_value=Path("/invalid/path")), \
-                patch("core.storage._get_config_file", return_value=Path("/invalid/path/settings.json")), \
-                patch("builtins.open", side_effect=IOError("Permission denied")):
+        with (
+            patch("core.storage._get_config_dir", return_value=Path("/invalid/path")),
+            patch("core.storage._get_config_file", return_value=Path("/invalid/path/settings.json")),
+            patch("builtins.open", side_effect=OSError("Permission denied")),
+        ):
             result = save_settings({"test": "value"})
             assert result is False
 
@@ -127,8 +136,10 @@ class TestStorage:
 
     def test_save_wish_settings(self):
         """Проверяет сохранение настроек wish калькулятора."""
-        with patch("core.storage._get_config_dir", return_value=self.temp_config_dir), \
-                patch("core.storage._get_config_file", return_value=self.temp_config_file):
+        with (
+            patch("core.storage._get_config_dir", return_value=self.temp_config_dir),
+            patch("core.storage._get_config_file", return_value=self.temp_config_file),
+        ):
             result = save_wish_settings(pity=40, guarantee=True, pulls=80, copies=3)
             assert result is True
 
@@ -140,8 +151,13 @@ class TestStorage:
         """Проверяет получение настроек pull калькулятора."""
         test_settings = {
             "wish": DEFAULT_SETTINGS["wish"],
-            "pull": {"current_pulls": 5, "current_polychromes": 800, "current_monochromes": 40, "subscription_days": 10,
-                     "days": 45},
+            "pull": {
+                "current_pulls": 5,
+                "current_polychromes": 800,
+                "current_monochromes": 40,
+                "subscription_days": 10,
+                "days": 45,
+            },
         }
 
         with patch("core.storage._get_config_file", return_value=self.temp_config_file):
@@ -154,8 +170,10 @@ class TestStorage:
 
     def test_save_pull_settings(self):
         """Проверяет сохранение настроек pull калькулятора."""
-        with patch("core.storage._get_config_dir", return_value=self.temp_config_dir), \
-                patch("core.storage._get_config_file", return_value=self.temp_config_file):
+        with (
+            patch("core.storage._get_config_dir", return_value=self.temp_config_dir),
+            patch("core.storage._get_config_file", return_value=self.temp_config_file),
+        ):
             result = save_pull_settings(
                 current_pulls=20,
                 current_polychromes=3200,
@@ -190,8 +208,10 @@ class TestStorage:
 
     def test_settings_persistence_roundtrip(self):
         """Проверяет полный цикл сохранения и загрузки."""
-        with patch("core.storage._get_config_dir", return_value=self.temp_config_dir), \
-                patch("core.storage._get_config_file", return_value=self.temp_config_file):
+        with (
+            patch("core.storage._get_config_dir", return_value=self.temp_config_dir),
+            patch("core.storage._get_config_file", return_value=self.temp_config_file),
+        ):
             # Сохраняем настройки
             save_wish_settings(pity=60, guarantee=False, pulls=120, copies=2)
             save_pull_settings(

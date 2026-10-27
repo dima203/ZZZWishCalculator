@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional
 
 
 @dataclass
 class Currency:
     """Текущие ресурсы игрока."""
+
     pulls: int = 0
     polychromes: int = 0
     monochromes: int = 0
@@ -15,6 +15,7 @@ class Currency:
 @dataclass
 class PullCalculationResult:
     """Результат расчёта количества круток за период."""
+
     total_pulls: int
     from_current_pulls: int
     from_current_polychromes: int
@@ -33,14 +34,14 @@ class PullCalculationResult:
 class ZZZPullCalculator:
     """
     Калькулятор количества круток, которые можно получить за указанное время.
-    
+
     Источники дохода:
     1. Ежедневные задания — 60 полихромов в день
     2. Подписка — 90 полихромов в день (учитывается оставшиеся дни подписки)
     3. Ежемесячный магазин — 5 круток 1 числа каждого месяца (бесконечная валюта)
     4. Еженедельные задания — 420 полихромов в неделю
     5. Нулевая каверна — 160 полихромов в неделю
-    
+
     Конвертация:
     - 1 крутка = 160 полихромов
     - 1 монохром = 1 полихром (1:1)
@@ -54,13 +55,13 @@ class ZZZPullCalculator:
     ZERO_HOLLOW_POLYCHROMES: int = 160
 
     def __init__(
-            self,
-            current_pulls: int = 0,
-            current_polychromes: int = 0,
-            current_monochromes: int = 0,
-            subscription_days: int = 0,
-            days: int = 30,
-            start_date: Optional[date] = None,
+        self,
+        current_pulls: int = 0,
+        current_polychromes: int = 0,
+        current_monochromes: int = 0,
+        subscription_days: int = 0,
+        days: int = 30,
+        start_date: date | None = None,
     ) -> None:
         """
         :param current_pulls: Текущее количество круток
@@ -110,25 +111,14 @@ class ZZZPullCalculator:
         monthly_shop_pulls = self._count_monthly_shop_pulls()
 
         total_polychromes_earned = (
-            daily_task_polychromes +
-            subscription_polychromes +
-            weekly_mission_polychromes +
-            zero_hollow_polychromes
+            daily_task_polychromes + subscription_polychromes + weekly_mission_polychromes + zero_hollow_polychromes
         )
 
-        total_polychromes_available = (
-            self.currency.polychromes +
-            self.currency.monochromes +
-            total_polychromes_earned
-        )
+        total_polychromes_available = self.currency.polychromes + self.currency.monochromes + total_polychromes_earned
 
         total_pulls_from_polychromes = total_polychromes_available // self.POLYCHROMES_PER_PULL
 
-        total_pulls = (
-            from_current_pulls +
-            total_pulls_from_polychromes +
-            monthly_shop_pulls
-        )
+        total_pulls = from_current_pulls + total_pulls_from_polychromes + monthly_shop_pulls
 
         return PullCalculationResult(
             total_pulls=total_pulls,

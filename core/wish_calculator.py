@@ -47,7 +47,7 @@ class ZZZGachaCalculator:
         init_arr[0] = 1.0
         states: dict[tuple[int, bool], list[float]] = {(self.current_pity, self.guarantee): init_arr}
 
-        for step in range(pulls):
+        for _ in range(pulls):
             new_states: dict[tuple[int, bool], list[float]] = {}
             for (pity, guar), prob_arr in states.items():
                 p_leg = self.prob_legendary[pity + 1]
@@ -77,22 +77,22 @@ class ZZZGachaCalculator:
 
     @staticmethod
     def _add_transition(
-            states: dict[tuple[int, bool], list[float]],
-            key: tuple[int, bool],
-            src_arr: list[float],
-            prob: float,
-            shift: int,
+        states: dict[tuple[int, bool], list[float]],
+        key: tuple[int, bool],
+        src_arr: list[float],
+        prob: float,
+        shift: int,
     ) -> None:
         """
         Добавляет вклад в состояние key: src_arr * prob, со сдвигом индекса k на shift.
         """
-        if prob == 0.0:
+        if prob <= 0.0:
             return
         if key not in states:
             states[key] = [0.0] * len(src_arr)
         dest = states[key]
         for k, val in enumerate(src_arr):
-            if val == 0.0:
+            if val <= 0.0:
                 continue
             dest_k = k + shift
             if dest_k < len(dest):
@@ -104,7 +104,7 @@ class ZZZGachaCalculator:
         return 1.0 - dist[0]
 
     def probability_k(self, pulls: int, k: int) -> float:
-        """Вероятность получить ровно k ивентовых легендарных за pulls круток."""
+        """Вероятность получить не менее k ивентовых легендарных за pulls круток."""
         if k < 0 or k > pulls:
             return 0.0
         dist = self._compute_distribution(pulls)

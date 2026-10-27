@@ -1,7 +1,9 @@
+from datetime import date
+
 import pytest
-from datetime import date, timedelta
+
+from core.pull_calculator import ZZZPullCalculator
 from core.wish_calculator import ZZZGachaCalculator
-from core.pull_calculator import ZZZPullCalculator, Currency, PullCalculationResult
 
 
 class TestZZZGachaCalculator:
@@ -130,7 +132,7 @@ class TestZZZPullCalculator:
             current_monochromes=50,
             subscription_days=15,
             days=60,
-            start_date=start
+            start_date=start,
         )
         assert calc.currency.pulls == 5
         assert calc.currency.polychromes == 1000
@@ -215,11 +217,7 @@ class TestZZZPullCalculator:
     def test_total_pulls_calculation(self):
         """Test total pulls combines all sources correctly."""
         calc = ZZZPullCalculator(
-            current_pulls=5,
-            current_polychromes=160,
-            current_monochromes=160,
-            subscription_days=30,
-            days=30
+            current_pulls=5, current_polychromes=160, current_monochromes=160, subscription_days=30, days=30
         )
         result = calc.calculate()
         # Total = current_pulls + (all_polychromes // 160) + monthly_shop
@@ -286,11 +284,7 @@ class TestEdgeCases:
 
     def test_pull_calculator_zero_days(self):
         """Test pull calculator with zero days."""
-        calc = ZZZPullCalculator(
-            current_pulls=5,
-            current_polychromes=320,
-            days=0
-        )
+        calc = ZZZPullCalculator(current_pulls=5, current_polychromes=320, days=0)
         result = calc.calculate()
         assert result.total_pulls == 7  # 5 + 2
         assert result.days_calculated == 0
